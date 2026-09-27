@@ -5,12 +5,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { communityApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { useAuthModal } from "@/lib/auth-modal-context";
-import { errorMessage, useToast } from "@/lib/toast-context";
+import { errorMessage } from "@/lib/toast-context";
 import { avatarColorClass, avatarInitials, cn, formatMonthYear } from "@/lib/utils";
 import type { CommunityCommentResponse, CommunityPostResponse, CommunityProfileResponse } from "@/lib/types";
 import { CommunityPostCard } from "@/components/community-post-card";
-import { Button } from "@/components/ui/button";
+import { FollowControl } from "@/components/community-follow-control";
 import { EmptyState, ErrorBanner, PageSpinner } from "@/components/ui/misc";
 
 type Tab = "posts" | "comments";
@@ -21,16 +20,13 @@ export default function CommunityProfilePage() {
   // profile state below) carries the logged-in viewer's own communityProfileId —
   // "is this my own profile" must compare against that, never against user.id,
   // which is the real account id and no longer what a community response returns.
-  const { user, profile: myProfile } = useAuth();
-  const { openLogin } = useAuthModal();
-  const { show } = useToast();
+  const { profile: myProfile } = useAuth();
   const [profile, setProfile] = useState<CommunityProfileResponse | null>(null);
   const [posts, setPosts] = useState<CommunityPostResponse[]>([]);
   const [comments, setComments] = useState<CommunityCommentResponse[]>([]);
   const [tab, setTab] = useState<Tab>("posts");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [followBusy, setFollowBusy] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -62,28 +58,6 @@ export default function CommunityProfilePage() {
 
   function handlePostDeleted(postId: string) {
     setPosts((prev) => prev.filter((p) => p.id !== postId));
-  }
-
-  async function handleToggleFollow() {
-    if (!profile) return;
-    if (!user) {
-      openLogin();
-      return;
-    }
-    setFollowBusy(true);
-    try {
-      if (profile.isFollowing) {
-        await communityApi.unfollow(profile.communityProfileId);
-        setProfile({ ...profile, isFollowing: false });
-      } else {
-        await communityApi.follow(profile.communityProfileId);
-        setProfile({ ...profile, isFollowing: true });
-      }
-    } catch (err) {
-      show(errorMessage(err), "error");
-    } finally {
-      setFollowBusy(false);
-    }
   }
 
   if (loading) return <PageSpinner />;
@@ -141,14 +115,12 @@ export default function CommunityProfilePage() {
           </div>
         </div>
         {!isOwnProfile && (
-          <Button
-            size="sm"
-            variant={profile.isFollowing ? "outline" : "primary"}
-            onClick={handleToggleFollow}
-            loading={followBusy}
-          >
-            {profile.isFollowing ? "Following" : "Follow"}
-          </Button>
+          <FollowControl
+            targetId={profile.communityProfileId}
+            displayName={`u/${profile.communityUsername}`}
+            following={profile.isFollowing}
+            onFollowingChange={(following) => setProfile({ ...profile, isFollowing: following })}
+          />
         )}
       </div>
 
