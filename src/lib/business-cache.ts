@@ -47,6 +47,7 @@ function toSummary(business: BusinessResponse): CachedBusinessSummary {
     latitude: business.latitude,
     longitude: business.longitude,
     branchCount: business.branchCount,
+    createdAt: business.createdAt,
   };
 }
 
@@ -98,5 +99,11 @@ export function toBusinessCardData(cached: CachedBusinessSummary): BusinessCardD
     hoursExceptions: null,
     latitude: cached.latitude ?? null,
     longitude: cached.longitude ?? null,
+    // An old cache entry from before createdAt was cached has no way to know its real age —
+    // defaulting to the epoch (never "new") is safer than guessing, since faking a recent
+    // date would show a "New" badge on a business that's actually been listed for years.
+    createdAt: cached.createdAt ?? new Date(0).toISOString(),
+    topReviewSnippet: null,
+    activeOffer: null,
   };
 }

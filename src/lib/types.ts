@@ -139,14 +139,24 @@ export interface BusinessResponse {
   // "About" tab show even when there's no other about-data, as long as FAQ exists.
   hasFaq: boolean | null;
   // Structured per-day hours (distinct from the legacy free-text `operatingHours` above) —
-  // detail response only, null on search/list results. Null/empty means the business hasn't
-  // set structured hours yet, so no "open now" badge is shown (see lib/business-hours.ts) —
-  // the legacy free text is never parsed to guess it, it's too unreliable a format.
+  // populated on the detail view AND on search/list results (backend batches one query per
+  // page, not per row — see BusinessService#search). Null/empty means the business hasn't set
+  // structured hours yet, so no "open now" badge is shown (see lib/business-hours.ts) — the
+  // legacy free text is never parsed to guess it, it's too unreliable a format.
   structuredHours: OperatingHoursEntry[] | null;
-  // Holiday / special-hours date-range overrides — detail response only, null on
-  // search/list results, same convention as structuredHours. An active exception
-  // always takes precedence over the recurring weekly entry (see lib/business-hours.ts).
+  // Holiday / special-hours date-range overrides — same detail-and-search-both, batched
+  // convention as structuredHours. An active exception always takes precedence over the
+  // recurring weekly entry (see lib/business-hours.ts).
   hoursExceptions: HoursExceptionEntry[] | null;
+  // Always populated (a plain entity column) — drives the card's "New" badge (< 14 days old).
+  createdAt: string;
+  // Search/list results only (batched, one query per page) — null on the detail response,
+  // which shows every review itself so a single excerpt adds nothing there.
+  topReviewSnippet: string | null;
+  // The one active offer to show as a card badge — same search/list-only, batched convention
+  // as topReviewSnippet. Shape matches exactly what offerDiscountLabel() (lib/offer-constants.ts)
+  // needs, so the card never has to special-case this vs. a full OfferResponse.
+  activeOffer: { title: string; offerType: OfferType; discountValue: number | null } | null;
 }
 
 /**
@@ -1071,6 +1081,7 @@ export interface CachedBusinessSummary {
   latitude?: number;
   longitude?: number;
   branchCount?: number | null;
+  createdAt?: string;
 }
 
 /** The subset of BusinessResponse the marketplace-style BusinessCard actually reads —
@@ -1097,6 +1108,9 @@ export type BusinessCardData = Pick<
   | "branchCount"
   | "structuredHours"
   | "hoursExceptions"
+  | "createdAt"
+  | "topReviewSnippet"
+  | "activeOffer"
 > & {
   latitude: number | null;
   longitude: number | null;

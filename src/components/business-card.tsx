@@ -9,20 +9,29 @@ import { getOpenStatus, type OpenStatus } from "@/lib/business-hours";
 import { offerDiscountLabel } from "@/lib/offer-constants";
 import { useLanguage } from "@/lib/language-context";
 import { useUserLocation } from "@/lib/location-context";
-import type { BusinessCardData, OfferResponse } from "@/lib/types";
+import type { BusinessCardData } from "@/lib/types";
 import { cn, distanceKm, focusRing, formatDistance, interactiveTransition } from "@/lib/utils";
 import { BookmarkButton } from "./bookmark-button";
 
-type ActiveOffer = Pick<OfferResponse, "offerType" | "discountValue" | "title">;
 type Variant = "grid" | "list" | "carousel";
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
 const GRID_IMAGE_SIZES = "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw";
+const NEW_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000;
 
 function openLabelFor(status: OpenStatus | null, t: Translate): string | null {
   if (!status) return null;
   if (status.open) return t("business_card.open");
   return status.changesAt ? t("business_card.closed_opens", { time: status.changesAt }) : t("business_card.closed");
+}
+
+/** The one overlay badge, by priority: active offer > "New" (< 14 days old) > none. Both
+ *  share the same slot/style — never two badges on the same card. */
+function badgeLabelFor(business: BusinessCardData, t: Translate): string | null {
+  if (business.activeOffer) return offerDiscountLabel(business.activeOffer);
+  const age = Date.now() - new Date(business.createdAt).getTime();
+  if (age >= 0 && age < NEW_THRESHOLD_MS) return t("business_card.new");
+  return null;
 }
 
 /** Photo, or a clean category-icon + initial placeholder — no next/image call at all
@@ -53,10 +62,10 @@ function CardPhoto({ business, sizes, className }: { business: BusinessCardData;
   );
 }
 
-function OfferBadge({ offer, className }: { offer: ActiveOffer; className?: string }) {
+function CardBadge({ label, className }: { label: string; className?: string }) {
   return (
     <span className={cn("rounded-md bg-crimson-600 px-1.5 py-0.5 text-[11px] font-semibold text-white", className)}>
-      {offerDiscountLabel(offer)}
+      {label}
     </span>
   );
 }
@@ -158,7 +167,7 @@ function VerifiedMark() {
   );
 }
 
-function CardMeta({ business, distance, activeOffer }: { business: BusinessCardData; distance: string | null; activeOffer?: ActiveOffer }) {
+function CardMeta({ business, distance }: { business: BusinessCardData; distance: string | null }) {
   const { lang } = useLanguage();
   return (
     <>
@@ -174,7 +183,7 @@ function CardMeta({ business, distance, activeOffer }: { business: BusinessCardD
       <p className="truncate text-[13px] text-ink-500">
         {business.areaName}, {business.cityName}
       </p>
-      {activeOffer && <p className="truncate text-xs font-medium text-crimson-600">{activeOffer.title}</p>}
+      {business.activeOffer && <p className="truncate text-xs font-medium text-crimson-600">{business.activeOffer.title}</p>}
     </>
   );
 }
@@ -221,22 +230,19 @@ function reviewsPhraseFor(business: BusinessCardData): string {
 export function BusinessCard({
   business,
   variant = "grid",
-  activeOffer,
   className,
 }: {
   business: BusinessCardData;
   variant?: Variant;
-  /** Supplied by the caller when it already has offer data cheaply available (see
-   *  app/page.tsx's Browse grid) — the card never fetches this itself (no per-card
-   *  offer lookup exists, and building one would mean an N+1 request per card). */
-  activeOffer?: ActiveOffer;
   className?: string;
 }) {
+  const { t } = useLanguage();
   const { status: locationStatus, coords } = useUserLocation();
   const distance =
     locationStatus === "granted" && coords && business.latitude != null && business.longitude != null
       ? formatDistance(distanceKm(coords, { lat: business.latitude, lng: business.longitude }))
       : null;
+  const badgeLabel = badgeLabelFor(business, t);
 
   const href = `/business/${business.slug}`;
   const srLabel = [
@@ -266,10 +272,13 @@ export function BusinessCard({
               {business.name}
               {business.verified && <VerifiedMark />}
             </h3>
-            {activeOffer && <OfferBadge offer={activeOffer} className="shrink-0" />}
+            {badgeLabel && <CardBadge label={badgeLabel} className="shrink-0" />}
           </div>
           <RatingLineWithMeta business={business} />
           <StatusAreaLine business={business} distance={distance} />
+          {business.topReviewSnippet && (
+            <p className="line-clamp-1 text-xs italic text-ink-500">&ldquo;{business.topReviewSnippet}&rdquo;</p>
+          )}
         </div>
       </Link>
     );
@@ -280,12 +289,12 @@ export function BusinessCard({
   return (
     <Link href={href} aria-label={srLabel} className={cn(cardClasses, "relative flex h-full flex-col overflow-hidden", className)}>
       <CardPhoto business={business} sizes={GRID_IMAGE_SIZES} className={variant === "carousel" ? "aspect-square" : "aspect-square md:aspect-[4/3]"} />
-      {activeOffer && <OfferBadge offer={activeOffer} className="absolute left-2 top-2" />}
+      {badgeLabel && <CardBadge label={badgeLabel} className="absolute left-2 top-2" />}
       <div className="absolute right-2 top-2">
         <BookmarkButton businessId={business.id} businessName={business.name} iconOnly />
       </div>
       <div className="flex flex-1 flex-col gap-1 p-3">
-        <CardMeta business={business} distance={distance} activeOffer={activeOffer} />
+        <CardMeta business={business} distance={distance} />
       </div>
     </Link>
   );

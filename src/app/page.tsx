@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { businessApi, offerApi } from "@/lib/api";
+import { businessApi } from "@/lib/api";
 import { rememberBusinesses } from "@/lib/business-cache";
 import { useHomeSearch } from "@/lib/home-search-context";
 import { useUserLocation } from "@/lib/location-context";
 import { errorMessage } from "@/lib/toast-context";
-import type { Area, BusinessResponse, Category, OfferResponse } from "@/lib/types";
+import type { Area, BusinessResponse, Category } from "@/lib/types";
 import { BrandCard } from "@/components/brand-card";
 import { BusinessCard } from "@/components/business-card";
 import { BusinessCarousel } from "@/components/business-carousel";
@@ -70,13 +70,6 @@ export default function HomePage() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [trending, setTrending] = useState<BusinessResponse[]>([]);
   const [mostLoved, setMostLoved] = useState<BusinessResponse[]>([]);
-  // Best-effort "does this business have an active offer" signal for the Browse grid's
-  // badge — a single platform-wide fetch (mirrors the trending/most_loved snapshot below),
-  // not a per-card lookup (no bulk offers-by-business-id endpoint exists, and calling
-  // offerApi.businessOffers() once per card would be an N+1 request per page of results).
-  // Only ever covers whatever's in this one feed page, so it's a "nice when it lines up",
-  // not a guarantee every business with an offer shows the badge.
-  const [offersByBusiness, setOffersByBusiness] = useState<Map<string, OfferResponse>>(new Map());
   const resultsRef = useRef<HTMLDivElement>(null);
   const heroTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -145,10 +138,6 @@ export default function HomePage() {
     businessApi
       .search({ sort: "most_loved", size: 10 })
       .then((page) => setMostLoved(page.content))
-      .catch(() => {});
-    offerApi
-      .feed({ size: 50 })
-      .then((page) => setOffersByBusiness(new Map(page.content.map((o) => [o.businessId, o]))))
       .catch(() => {});
   }, []);
 
@@ -336,7 +325,7 @@ export default function HomePage() {
                       {b.branchCount && b.branchCount > 1 ? (
                         <BrandCard business={b} />
                       ) : (
-                        <BusinessCard business={b} activeOffer={offersByBusiness.get(b.id)} />
+                        <BusinessCard business={b} />
                       )}
                     </Reveal>
                   ))}
