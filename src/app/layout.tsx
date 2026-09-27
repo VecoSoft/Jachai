@@ -6,6 +6,7 @@ import { AuthModalProvider } from "@/lib/auth-modal-context";
 import { CommunityUsernameModalProvider } from "@/lib/community-username-modal-context";
 import { HomeSearchProvider } from "@/lib/home-search-context";
 import { LanguageProvider } from "@/lib/language-context";
+import { LocationProvider } from "@/lib/location-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { ToastProvider } from "@/lib/toast-context";
 import { Navbar } from "@/components/navbar";
@@ -65,13 +66,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <LanguageProvider>
                 <AuthModalProvider>
                   <CommunityUsernameModalProvider>
-                    <HomeSearchProvider>
-                      <Navbar />
-                      {children}
-                      <SiteFooter />
-                      <AuthModal />
-                      <CommunityUsernameModal />
-                    </HomeSearchProvider>
+                    <LocationProvider>
+                      <HomeSearchProvider>
+                        <Navbar />
+                        {children}
+                        <SiteFooter />
+                        <AuthModal />
+                        <CommunityUsernameModal />
+                      </HomeSearchProvider>
+                    </LocationProvider>
                   </CommunityUsernameModalProvider>
                 </AuthModalProvider>
               </LanguageProvider>

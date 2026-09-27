@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { referenceApi } from "./api";
 import { PAGE_SIZE } from "./config";
+import { useUserLocation } from "./location-context";
 import type { Area, BusinessSearchParams, Category, City } from "./types";
 
 interface HomeSearchContextValue {
@@ -27,11 +28,45 @@ const HomeSearchContext = createContext<HomeSearchContextValue | null>(null);
  */
 export function HomeSearchProvider({ children }: { children: ReactNode }) {
   const [params, setParams] = useState<BusinessSearchParams>({ sort: "newest", page: 0, size: PAGE_SIZE });
-  const [locationStatus, setLocationStatus] = useState<"idle" | "locating" | "granted" | "denied">("idle");
+  // Location itself now lives in the shared LocationProvider (lib/location-context.tsx) —
+  // the Navbar's Near me button, the Browse location chip and every BusinessCard's distance
+  // all read the same grant. This provider layers one thing on top just for its own "Near
+  // me" button: re-sorting by distance, but only the one time *this* button caused a fresh
+  // grant — a silent restore of a still-valid grant from a previous visit (or a grant made
+  // via the Browse chip instead) shows distance on cards immediately but never silently
+  // overrides whatever sort/filters this page session already has.
+  const { status: sharedStatus, coords, request } = useUserLocation();
+  const explicitRequestRef = useRef(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [cityId, setCityId] = useState<string>("");
+
+  useEffect(() => {
+    if (!explicitRequestRef.current) return;
+    if (sharedStatus === "granted" && coords) {
+      explicitRequestRef.current = false;
+      setParams((prev) => ({
+        ...prev,
+        lat: coords.lat,
+        lng: coords.lng,
+        radiusMeters: 5000,
+        sort: "distance",
+        page: 0,
+      }));
+    } else if (sharedStatus === "denied" || sharedStatus === "unavailable") {
+      explicitRequestRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedStatus, coords]);
+
+  function useMyLocation() {
+    explicitRequestRef.current = true;
+    request();
+  }
+
+  const locationStatus: "idle" | "locating" | "granted" | "denied" =
+    sharedStatus === "asking" ? "locating" : sharedStatus === "unavailable" ? "denied" : sharedStatus;
 
   useEffect(() => {
     referenceApi.categories().then(setCategories).catch(() => {});
@@ -51,29 +86,6 @@ export function HomeSearchProvider({ children }: { children: ReactNode }) {
     }
     referenceApi.areas(cityId).then(setAreas).catch(() => {});
   }, [cityId]);
-
-  function useMyLocation() {
-    if (!("geolocation" in navigator)) {
-      setLocationStatus("denied");
-      return;
-    }
-    setLocationStatus("locating");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocationStatus("granted");
-        setParams((prev) => ({
-          ...prev,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          radiusMeters: 5000,
-          sort: "distance",
-          page: 0,
-        }));
-      },
-      () => setLocationStatus("denied"),
-      { timeout: 8000 }
-    );
-  }
 
   return (
     <HomeSearchContext.Provider

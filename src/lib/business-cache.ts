@@ -1,4 +1,4 @@
-import type { BusinessResponse, CachedBusinessSummary } from "./types";
+import type { BusinessCardData, BusinessResponse, CachedBusinessSummary } from "./types";
 
 // The backend's Bookmark, MessageThread etc. records only carry a raw
 // businessId (UUID) — there's no endpoint to fetch a business by id (only by
@@ -31,9 +31,8 @@ function writeCache(cache: Record<string, CachedBusinessSummary>) {
   }
 }
 
-export function rememberBusiness(business: BusinessResponse) {
-  const cache = readCache();
-  cache[business.id] = {
+function toSummary(business: BusinessResponse): CachedBusinessSummary {
+  return {
     id: business.id,
     name: business.name,
     slug: business.slug,
@@ -41,7 +40,19 @@ export function rememberBusiness(business: BusinessResponse) {
     categoryName: business.categoryName,
     areaName: business.areaName,
     cityName: business.cityName,
+    priceTier: business.priceTier,
+    verified: business.verified,
+    averageRating: business.averageRating,
+    reviewCount: business.reviewCount,
+    latitude: business.latitude,
+    longitude: business.longitude,
+    branchCount: business.branchCount,
   };
+}
+
+export function rememberBusiness(business: BusinessResponse) {
+  const cache = readCache();
+  cache[business.id] = toSummary(business);
   writeCache(cache);
 }
 
@@ -49,19 +60,43 @@ export function rememberBusinesses(businesses: BusinessResponse[]) {
   if (!businesses.length) return;
   const cache = readCache();
   for (const b of businesses) {
-    cache[b.id] = {
-      id: b.id,
-      name: b.name,
-      slug: b.slug,
-      coverPhotoUrl: b.coverPhotoUrl,
-      categoryName: b.categoryName,
-      areaName: b.areaName,
-      cityName: b.cityName,
-    };
+    cache[b.id] = toSummary(b);
   }
   writeCache(cache);
 }
 
 export function lookupBusiness(id: string): CachedBusinessSummary | null {
   return readCache()[id] ?? null;
+}
+
+/**
+ * Adapts a cache entry to BusinessCard's props — or null when the entry predates the
+ * rating/price fields (an old cache write, or one that only ever saw a business through
+ * a code path that didn't call rememberBusiness at all), which isn't enough to render the
+ * marketplace-style card without faking data the cache never actually had.
+ */
+export function toBusinessCardData(cached: CachedBusinessSummary): BusinessCardData | null {
+  if (cached.priceTier === undefined || cached.averageRating === undefined || cached.reviewCount === undefined) {
+    return null;
+  }
+  return {
+    id: cached.id,
+    name: cached.name,
+    slug: cached.slug,
+    categoryName: cached.categoryName,
+    areaName: cached.areaName,
+    cityName: cached.cityName,
+    photoUrls: cached.coverPhotoUrl ? [cached.coverPhotoUrl] : [],
+    priceTier: cached.priceTier,
+    verified: cached.verified ?? false,
+    averageRating: cached.averageRating,
+    reviewCount: cached.reviewCount,
+    flagged: false,
+    flagReason: null,
+    branchCount: cached.branchCount ?? null,
+    structuredHours: null,
+    hoursExceptions: null,
+    latitude: cached.latitude ?? null,
+    longitude: cached.longitude ?? null,
+  };
 }

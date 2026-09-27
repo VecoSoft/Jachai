@@ -122,11 +122,15 @@ export const dictionary: Record<PreferredLanguage, Record<string, string>> = {
     "common.uploading": "Uploading…",
     "common.selected_file": "Selected: {name}",
 
-    // business-card.tsx / similar-business-card.tsx
+    // business-card.tsx
     "business_card.review_count.one": "{n} review",
     "business_card.review_count.other": "{n} reviews",
     "business_card.rating_count.one": "{n} rating",
     "business_card.rating_count.other": "{n} ratings",
+    "business_card.new_no_reviews": "New · no reviews yet",
+    "business_card.open": "Open",
+    "business_card.closed": "Closed",
+    "business_card.closed_opens": "Closed · opens {time}",
 
     // brand-card.tsx
     "brand_card.branch_count.one": "{n} branch",
@@ -425,10 +429,14 @@ export const dictionary: Record<PreferredLanguage, Record<string, string>> = {
     "common.uploading": "আপলোড হচ্ছে…",
     "common.selected_file": "নির্বাচিত: {name}",
 
-    // business-card.tsx / similar-business-card.tsx — Bangla has no one/other
-    // cardinal split (see translateCount() in this file), so only ".other" is needed.
+    // business-card.tsx — Bangla has no one/other cardinal split (see
+    // translateCount() in this file), so only ".other" is needed.
     "business_card.review_count.other": "{n}টি রিভিউ",
     "business_card.rating_count.other": "{n}টি রেটিং",
+    "business_card.new_no_reviews": "নতুন · এখনো কোনো রিভিউ নেই",
+    "business_card.open": "খোলা",
+    "business_card.closed": "বন্ধ",
+    "business_card.closed_opens": "বন্ধ · খুলবে {time}",
 
     // brand-card.tsx
     "brand_card.branch_count.other": "{n}টি শাখা",

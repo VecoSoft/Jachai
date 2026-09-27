@@ -3,6 +3,7 @@
 import { useState, type TouchEvent } from "react";
 import { getOpenStatus } from "@/lib/business-hours";
 import { PRICE_TIER_LABELS } from "@/lib/config";
+import { useUserLocation } from "@/lib/location-context";
 import type { BusinessResponse } from "@/lib/types";
 import { cn, distanceKm, focusRing, formatDistance, interactiveTransition } from "@/lib/utils";
 import { BranchSwitcher } from "./branch-switcher";
@@ -30,17 +31,8 @@ const HERO_GRADIENT = {
  * is unreadable, so it falls back to the single swipeable cinematic photo
  * (same as Yelp's own mobile behavior).
  */
-export function BusinessHeroGallery({
-  business,
-  userLocation,
-  locationStatus,
-  onShowDistance,
-}: {
-  business: BusinessResponse;
-  userLocation: { lat: number; lng: number } | null;
-  locationStatus: "idle" | "locating" | "denied";
-  onShowDistance: () => void;
-}) {
+export function BusinessHeroGallery({ business }: { business: BusinessResponse }) {
+  const { status: locationStatus, coords, request } = useUserLocation();
   const photos = business.photoUrls;
   const stripPhotos = photos.slice(0, 5);
   const [heroIndex, setHeroIndex] = useState(0);
@@ -76,9 +68,10 @@ export function BusinessHeroGallery({
     setTouchStartX(null);
   }
 
-  const distance = userLocation
-    ? formatDistance(distanceKm(userLocation, { lat: business.latitude, lng: business.longitude }))
-    : null;
+  const distance =
+    locationStatus === "granted" && coords
+      ? formatDistance(distanceKm(coords, { lat: business.latitude, lng: business.longitude }))
+      : null;
 
   // Business identity block, overlaid on the gradient — headingClass differs between the
   // full-width single-photo hero (room to scale up to 6xl) and a photo-strip's narrower
@@ -173,18 +166,18 @@ export function BusinessHeroGallery({
               <span>{distance}</span>
             </>
           )}
-          {!userLocation && locationStatus !== "denied" && (
+          {!distance && locationStatus !== "denied" && locationStatus !== "unavailable" && (
             <>
               <span aria-hidden className="text-white/50">
                 ·
               </span>
               <button
                 type="button"
-                onClick={onShowDistance}
-                disabled={locationStatus === "locating"}
+                onClick={request}
+                disabled={locationStatus === "asking"}
                 className={cn("pointer-events-auto rounded underline decoration-white/50 hover:decoration-white disabled:opacity-60", focusRing)}
               >
-                {locationStatus === "locating" ? "Locating…" : "Show distance from me"}
+                {locationStatus === "asking" ? "Locating…" : "Show distance from me"}
               </button>
             </>
           )}

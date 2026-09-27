@@ -12,10 +12,14 @@ import { IconButton } from "./ui/icon-button";
 
 export function BookmarkButton({
   businessId,
+  businessName,
   iconOnly,
   tile,
 }: {
   businessId: string;
+  /** Gives the iconOnly variant's aria-label the business's name (e.g. "Save KFC Gulshan 1")
+   *  instead of the generic fallback — optional so existing call sites are unaffected. */
+  businessName?: string;
   iconOnly?: boolean;
   /** BusinessActions grid look — flex-col icon-over-label tile, matches Call/Directions/Message. */
   tile?: boolean;
@@ -111,6 +115,13 @@ export function BookmarkButton({
   }
 
   if (iconOnly) {
+    const label = businessName
+      ? bookmarked
+        ? `Remove ${businessName} from saved`
+        : `Save ${businessName}`
+      : bookmarked
+        ? "Remove bookmark"
+        : "Save business";
     return (
       // unstyled, not a color variant — this floats over a photo of unknown color, so it
       // needs its own translucent-white chrome plus a conditional (bookmarked/not) text
@@ -121,8 +132,9 @@ export function BookmarkButton({
         size="sm"
         onClick={quickToggle}
         disabled={busy}
-        aria-label={bookmarked ? "Remove bookmark" : "Save business"}
-        title={bookmarked ? "Remove bookmark" : "Save business"}
+        aria-label={label}
+        aria-pressed={bookmarked}
+        title={label}
         className={cn(
           "bg-white/90 shadow-sm ring-1 ring-black/5 hover:bg-white disabled:cursor-default",
           bookmarked ? "text-crimson-600" : "text-ink-600"

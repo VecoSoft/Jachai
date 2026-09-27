@@ -26,7 +26,7 @@ import { CreateBusinessAccountModal } from "@/components/create-business-account
 import { ReportButton } from "@/components/report-button";
 import { IconButton } from "@/components/ui/icon-button";
 import { BusinessMessageSidebarCard, BusinessMessageWidget, type MessageWidgetState } from "@/components/business-message-widget";
-import { SimilarBusinessCard } from "@/components/similar-business-card";
+import { BusinessCarousel } from "@/components/business-carousel";
 import { BusinessHeroGallery } from "@/components/business-hero-gallery";
 import { OfferBusinessBanner } from "@/components/offer-business-banner";
 import { BusinessTabs, type BusinessTab } from "@/components/business-tabs";
@@ -160,9 +160,6 @@ export default function BusinessDetailPage() {
   const [messageWidgetState, setMessageWidgetState] = useState<MessageWidgetState>("closed");
   const [switchingForClaim, setSwitchingForClaim] = useState(false);
 
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [locationStatus, setLocationStatus] = useState<"idle" | "locating" | "denied">("idle");
-
   // Section nav (spec: Reviews default, tabs only shown when the business has
   // data for them). Panels stay mounted and toggle via `hidden` so the
   // #reviews anchor / scroll-into-view keep working from the hero.
@@ -217,19 +214,6 @@ export default function BusinessDetailPage() {
       .mineForBusiness(businessId)
       .then(setMyReview)
       .catch(() => setMyReview(null));
-  }
-
-  function showDistanceFromMe() {
-    if (!("geolocation" in navigator)) {
-      setLocationStatus("denied");
-      return;
-    }
-    setLocationStatus("locating");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setLocationStatus("denied"),
-      { timeout: 8000 }
-    );
   }
 
   const loadReviews = useCallback(
@@ -376,12 +360,7 @@ export default function BusinessDetailPage() {
 
   return (
     <div>
-      <BusinessHeroGallery
-        business={business}
-        userLocation={userLocation}
-        locationStatus={locationStatus}
-        onShowDistance={showDistanceFromMe}
-      />
+      <BusinessHeroGallery business={business} />
 
       {business.flagged && (
         <div className="mt-4 flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/5 px-4 py-3">
@@ -654,14 +633,7 @@ export default function BusinessDetailPage() {
 
           {similarBusinesses.length > 0 && (
             <div className="mt-8 border-t border-ink-100 pt-6">
-              <h2 className="mb-3 font-display text-lg font-semibold text-ink-900">Similar businesses nearby</h2>
-              <div className="-mx-1 flex snap-x gap-4 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {similarBusinesses.map((b) => (
-                  <div key={b.id} className="w-[72vw] max-w-[15rem] shrink-0 snap-start sm:w-60">
-                    <SimilarBusinessCard business={b} userLocation={userLocation ?? undefined} />
-                  </div>
-                ))}
-              </div>
+              <BusinessCarousel title="Similar businesses nearby" businesses={similarBusinesses} />
             </div>
           )}
         </div>

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { businessApi } from "@/lib/api";
+import { businessApi, offerApi } from "@/lib/api";
 import { rememberBusinesses } from "@/lib/business-cache";
 import { useHomeSearch } from "@/lib/home-search-context";
+import { useUserLocation } from "@/lib/location-context";
 import { errorMessage } from "@/lib/toast-context";
-import type { Area, BusinessResponse, Category } from "@/lib/types";
+import type { Area, BusinessResponse, Category, OfferResponse } from "@/lib/types";
 import { BrandCard } from "@/components/brand-card";
 import { BusinessCard } from "@/components/business-card";
 import { BusinessCarousel } from "@/components/business-carousel";
@@ -13,6 +14,7 @@ import { BusinessFilters } from "@/components/business-filters";
 import { CategoryQuickNav } from "@/components/category-quick-nav";
 import { CategoriesGrid } from "@/components/categories-grid";
 import { ExploreCities } from "@/components/explore-cities";
+import { LocationChip } from "@/components/location-chip";
 import { QuestionsForYouWidget } from "@/components/questions-for-you-widget";
 import { Reveal } from "@/components/reveal";
 import { EmptyState, ErrorBanner, Pagination } from "@/components/ui/misc";
@@ -27,39 +29,17 @@ const HERO_IMAGES = [
 ];
 const HERO_ROTATE_INTERVAL_MS = 5000;
 
+/** Same shape as the real grid BusinessCard (see components/business-card.tsx) at every
+ *  width now that the grid is 2-5 columns throughout, not a different layout on mobile. */
 function SkeletonCard() {
   return (
-    <div className="overflow-hidden rounded-xl border border-ink-100/70 bg-surface shadow-card">
-      {/* Mobile: horizontal list row */}
-      <div className="flex gap-3 p-3 sm:hidden">
-        <Skeleton className="h-24 w-24 flex-none rounded-lg" />
-        <div className="min-w-0 flex-1 space-y-2 py-1">
-          <Skeleton className="h-3.5 w-3/4 rounded" />
-          <Skeleton className="h-3 w-1/2 rounded" />
-          <Skeleton className="h-2.5 w-2/3 rounded" />
-          <Skeleton className="h-2.5 w-full rounded" />
-        </div>
-      </div>
-
-      {/* Desktop: photo tile */}
-      <div className="hidden sm:block">
-        <div className="p-4 pb-3 flex items-center gap-2.5">
-          <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <Skeleton className="h-3.5 w-3/4 rounded" />
-            <Skeleton className="h-2.5 w-1/2 rounded" />
-          </div>
-        </div>
-        <Skeleton className="h-44 w-full" />
-        <div className="p-4 space-y-2.5">
-          <Skeleton className="h-3.5 w-1/3 rounded" />
-          <Skeleton className="h-3 w-2/3 rounded" />
-          <div className="pt-3 mt-1 border-t border-ink-100 flex gap-2">
-            <Skeleton className="h-6 w-14 rounded-full" />
-            <Skeleton className="h-6 w-14 rounded-full" />
-            <Skeleton className="h-6 w-14 rounded-full" />
-          </div>
-        </div>
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-ink-100 dark:border-ink-800">
+      <Skeleton className="aspect-square w-full md:aspect-[4/3]" />
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <Skeleton className="h-3.5 w-4/5 rounded" />
+        <Skeleton className="h-3 w-1/3 rounded" />
+        <Skeleton className="h-2.5 w-2/3 rounded" />
+        <Skeleton className="h-2.5 w-1/2 rounded" />
       </div>
     </div>
   );
@@ -80,9 +60,8 @@ export default function HomePage() {
     cityId,
     setCityId,
   } = useHomeSearch();
+  const { clear: clearLocation } = useUserLocation();
 
-  const [browseLocation, setBrowseLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [browseLocationStatus, setBrowseLocationStatus] = useState<"idle" | "locating" | "denied">("idle");
   const [results, setResults] = useState<BusinessResponse[]>([]);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
@@ -91,6 +70,13 @@ export default function HomePage() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [trending, setTrending] = useState<BusinessResponse[]>([]);
   const [mostLoved, setMostLoved] = useState<BusinessResponse[]>([]);
+  // Best-effort "does this business have an active offer" signal for the Browse grid's
+  // badge — a single platform-wide fetch (mirrors the trending/most_loved snapshot below),
+  // not a per-card lookup (no bulk offers-by-business-id endpoint exists, and calling
+  // offerApi.businessOffers() once per card would be an N+1 request per page of results).
+  // Only ever covers whatever's in this one feed page, so it's a "nice when it lines up",
+  // not a guarantee every business with an offer shows the badge.
+  const [offersByBusiness, setOffersByBusiness] = useState<Map<string, OfferResponse>>(new Map());
   const resultsRef = useRef<HTMLDivElement>(null);
   const heroTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -160,6 +146,10 @@ export default function HomePage() {
       .search({ sort: "most_loved", size: 10 })
       .then((page) => setMostLoved(page.content))
       .catch(() => {});
+    offerApi
+      .feed({ size: 50 })
+      .then((page) => setOffersByBusiness(new Map(page.content.map((o) => [o.businessId, o]))))
+      .catch(() => {});
   }, []);
 
   function scrollToResults() {
@@ -185,24 +175,6 @@ export default function HomePage() {
     setParams({ ...params, areaId: area.id, page: 0 });
     scrollToResults();
   }
-
-  function showDistances() {
-    if (!("geolocation" in navigator)) {
-      setBrowseLocationStatus("denied");
-      return;
-    }
-    setBrowseLocationStatus("locating");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setBrowseLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setBrowseLocationStatus("denied"),
-      { timeout: 8000 }
-    );
-  }
-
-  const cardLocation =
-    params.lat !== undefined && params.lng !== undefined
-      ? { lat: params.lat, lng: params.lng }
-      : browseLocation;
 
   return (
     <>
@@ -296,12 +268,12 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
           {trending.length > 0 && (
             <Reveal>
-              <BusinessCarousel title="Trending this week" businesses={trending} badge="trending" />
+              <BusinessCarousel title="Trending this week" businesses={trending} />
             </Reveal>
           )}
           {mostLoved.length > 0 && (
             <Reveal>
-              <BusinessCarousel title="Most loved" businesses={mostLoved} badge="most_loved" />
+              <BusinessCarousel title="Most loved" businesses={mostLoved} />
             </Reveal>
           )}
         </div>
@@ -331,9 +303,16 @@ export default function HomePage() {
             </div>
           </Reveal>
 
+          <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <LocationChip status={locationStatus} onRequest={useMyLocation} onClear={clearLocation} />
+            {locationStatus === "granted" && params.sort === "distance" && (
+              <span className="text-xs text-ink-400">Sorted by distance</span>
+            )}
+          </div>
+
           {loading && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
-              {Array.from({ length: 8 }).map((_, i) => (
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {Array.from({ length: 10 }).map((_, i) => (
                 <SkeletonCard key={i} />
               ))}
             </div>
@@ -344,20 +323,6 @@ export default function HomePage() {
             <>
               <p key={totalElements} className="animate-fade-in text-sm font-medium text-ink-500 mb-4">
                 {totalElements} businesses found
-                {!cardLocation && browseLocationStatus !== "denied" && (
-                  <>
-                    {" "}
-                    ·{" "}
-                    <button
-                      type="button"
-                      onClick={showDistances}
-                      disabled={browseLocationStatus === "locating"}
-                      className="text-crimson-600 hover:underline disabled:opacity-60 transition-opacity"
-                    >
-                      {browseLocationStatus === "locating" ? "Locating…" : "Show distance from me"}
-                    </button>
-                  </>
-                )}
               </p>
               {results.length === 0 ? (
                 <EmptyState
@@ -365,13 +330,13 @@ export default function HomePage() {
                   description="Try widening your area, dropping the minimum rating, or clearing a filter."
                 />
               ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                   {results.map((b, i) => (
                     <Reveal key={b.id} delay={Math.min(i, 8) * 60}>
                       {b.branchCount && b.branchCount > 1 ? (
                         <BrandCard business={b} />
                       ) : (
-                        <BusinessCard business={b} userLocation={cardLocation ?? undefined} />
+                        <BusinessCard business={b} activeOffer={offersByBusiness.get(b.id)} />
                       )}
                     </Reveal>
                   ))}

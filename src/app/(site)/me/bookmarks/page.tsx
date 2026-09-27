@@ -5,8 +5,9 @@ import Link from "next/link";
 import { bookmarkApi } from "@/lib/api";
 import { RoleGate } from "@/components/role-gate";
 import { errorMessage, useToast } from "@/lib/toast-context";
-import { lookupBusiness } from "@/lib/business-cache";
+import { lookupBusiness, toBusinessCardData } from "@/lib/business-cache";
 import type { Bookmark, Collection } from "@/lib/types";
+import { BusinessCard } from "@/components/business-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { EmptyState, ErrorBanner, PageSpinner } from "@/components/ui/misc";
@@ -14,6 +15,7 @@ import { EmptyState, ErrorBanner, PageSpinner } from "@/components/ui/misc";
 function BookmarkRow({ bookmark, onRemoved }: { bookmark: Bookmark; onRemoved: () => void }) {
   const { show } = useToast();
   const cached = lookupBusiness(bookmark.businessId);
+  const cardData = cached ? toBusinessCardData(cached) : null;
   const [removing, setRemoving] = useState(false);
 
   async function remove() {
@@ -26,6 +28,27 @@ function BookmarkRow({ bookmark, onRemoved }: { bookmark: Bookmark; onRemoved: (
     } finally {
       setRemoving(false);
     }
+  }
+
+  // Bookmarks only ever carry a raw businessId (no "get business by id" endpoint exists) —
+  // the rich card only renders once this business has been seen elsewhere in the app and
+  // cached (see lib/business-cache.ts). Never seen before (or bookmarked on another
+  // device/browser) falls back to this plain row instead of faking rating/price data.
+  if (cardData) {
+    return (
+      <div className="relative border-b border-ink-100 py-3 last:border-0">
+        <BusinessCard business={cardData} variant="list" />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={remove}
+          loading={removing}
+          className="absolute right-2 top-2 bg-surface/90"
+        >
+          Remove
+        </Button>
+      </div>
+    );
   }
 
   return (

@@ -1060,7 +1060,47 @@ export interface CachedBusinessSummary {
   categoryName: string;
   areaName: string;
   cityName: string;
+  // Added for the marketplace-style BusinessCard (rating/price/distance) — all optional
+  // since a cache entry written before this field existed still deserializes fine, just
+  // without it. See business-cache.ts#toBusinessCardData for the "not enough to render
+  // the rich card yet" fallback this makes possible.
+  priceTier?: PriceTier;
+  verified?: boolean;
+  averageRating?: number;
+  reviewCount?: number;
+  latitude?: number;
+  longitude?: number;
+  branchCount?: number | null;
 }
+
+/** The subset of BusinessResponse the marketplace-style BusinessCard actually reads —
+ *  lets it also render from a CachedBusinessSummary (bookmarks/message-thread screens,
+ *  which only ever have a businessId — see business-cache.ts), not just a full search
+ *  result. latitude/longitude are nullable here (unlike BusinessResponse) for exactly
+ *  that case: an older cache entry predating those fields, or one that never saw a
+ *  business with a photoUrls array (only a coverPhotoUrl) still satisfies this type. */
+export type BusinessCardData = Pick<
+  BusinessResponse,
+  | "id"
+  | "name"
+  | "slug"
+  | "categoryName"
+  | "areaName"
+  | "cityName"
+  | "photoUrls"
+  | "priceTier"
+  | "verified"
+  | "averageRating"
+  | "reviewCount"
+  | "flagged"
+  | "flagReason"
+  | "branchCount"
+  | "structuredHours"
+  | "hoursExceptions"
+> & {
+  latitude: number | null;
+  longitude: number | null;
+};
 
 // ---------------------------------------------------------------------------
 // "Join Community" V1 — Reddit-style pseudonymous text discussion (formerly
