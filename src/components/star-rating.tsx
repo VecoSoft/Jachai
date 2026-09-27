@@ -3,19 +3,9 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-export function StarDisplay({ rating, size = "md" }: { rating: number; size?: "sm" | "md" | "lg" }) {
-  const sizeClass = { sm: "text-sm", md: "text-lg", lg: "text-2xl" }[size];
-  return (
-    <div className={cn("flex text-crimson-600", sizeClass)} aria-label={`${rating} out of 5 stars`}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <span key={n} className={n <= Math.round(rating) ? "" : "text-ink-200"}>
-          ★
-        </span>
-      ))}
-    </div>
-  );
-}
-
+/** The read-only rating display used to live here as StarDisplay — replaced everywhere
+ *  by <RatingBoxes /> (components/rating-boxes.tsx), the one rating style across the site.
+ *  This file now holds only the interactive 1-5 picker below, untouched by that change. */
 export function StarInput({
   value,
   onChange,

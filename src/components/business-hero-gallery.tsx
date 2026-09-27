@@ -5,11 +5,11 @@ import { getOpenStatus } from "@/lib/business-hours";
 import { PRICE_TIER_LABELS } from "@/lib/config";
 import { useUserLocation } from "@/lib/location-context";
 import type { BusinessResponse } from "@/lib/types";
-import { cn, distanceKm, focusRing, formatDistance, interactiveTransition } from "@/lib/utils";
+import { cn, distanceKm, focusRing, formatDistance, formatReviewCount, interactiveTransition } from "@/lib/utils";
 import { BranchSwitcher } from "./branch-switcher";
 import { GalleryImage } from "./gallery-image";
 import { PhotoGalleryModal } from "./photo-gallery-modal";
-import { StarDisplay } from "./star-rating";
+import { RatingBoxes } from "./rating-boxes";
 import { VerifiedBadge } from "./verified-badge";
 
 // Cinematic bottom gradient — brighter at the top so the photo itself stays
@@ -86,14 +86,20 @@ export function BusinessHeroGallery({ business }: { business: BusinessResponse }
         </h1>
 
         <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <StarDisplay rating={business.averageRating} size="lg" />
-          <span className="text-lg sm:text-xl font-bold text-white">{business.averageRating.toFixed(1)}</span>
-          <a
-            href="#reviews"
-            className="pointer-events-auto text-sm sm:text-lg text-white/80 hover:text-white hover:underline"
-          >
-            ({business.reviewCount} {business.reviewCount === 1 ? "review" : "reviews"})
-          </a>
+          {business.reviewCount === 0 ? (
+            <span className="text-sm sm:text-lg text-white/90">New · no reviews yet</span>
+          ) : (
+            <>
+              <RatingBoxes rating={business.averageRating} size="md" />
+              <span className="text-lg sm:text-xl font-bold text-white">{business.averageRating.toFixed(1)}</span>
+              <a
+                href="#reviews"
+                className="pointer-events-auto text-sm sm:text-lg text-white/80 hover:text-white hover:underline"
+              >
+                ({formatReviewCount(business.reviewCount)} {business.reviewCount === 1 ? "review" : "reviews"})
+              </a>
+            </>
+          )}
         </div>
 
         <div className="mt-2 sm:mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 sm:gap-y-1.5 text-sm sm:text-lg text-white/90 drop-shadow-sm">

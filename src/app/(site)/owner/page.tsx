@@ -8,8 +8,9 @@ import { BusinessAccountCta } from "@/components/business-account-cta";
 import { rememberBusinesses } from "@/lib/business-cache";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import type { BusinessResponse } from "@/lib/types";
+import { formatReviewCount } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/verified-badge";
-import { StarDisplay } from "@/components/star-rating";
+import { RatingBoxes } from "@/components/rating-boxes";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorBanner, PageSpinner } from "@/components/ui/misc";
 
@@ -83,9 +84,9 @@ function MyBusinessesContent() {
                   {b.categoryName} · {b.areaName}, {b.cityName}
                 </p>
                 <div className="mt-1.5 flex items-center gap-2">
-                  <StarDisplay rating={b.averageRating} size="sm" />
+                  <RatingBoxes rating={b.averageRating} size="sm" />
                   <span className="text-xs text-ink-500">
-                    {b.averageRating.toFixed(1)} ({b.reviewCount})
+                    {b.averageRating.toFixed(1)} ({formatReviewCount(b.reviewCount)})
                   </span>
                 </div>
               </div>

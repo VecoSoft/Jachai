@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { BadgeCheck, MapPin, Star } from "lucide-react";
+import { BadgeCheck, MapPin } from "lucide-react";
 import { priceTierLabel } from "@/lib/config";
 import { categoryIcon } from "@/lib/category-icons";
 import { getOpenStatus, type OpenStatus } from "@/lib/business-hours";
@@ -10,8 +10,9 @@ import { offerDiscountLabel } from "@/lib/offer-constants";
 import { useLanguage } from "@/lib/language-context";
 import { useUserLocation } from "@/lib/location-context";
 import type { BusinessCardData } from "@/lib/types";
-import { cn, distanceKm, focusRing, formatDistance, interactiveTransition } from "@/lib/utils";
+import { cn, distanceKm, focusRing, formatDistance, formatReviewCount, interactiveTransition } from "@/lib/utils";
 import { BookmarkButton } from "./bookmark-button";
+import { RatingBoxes } from "./rating-boxes";
 
 type Variant = "grid" | "list" | "carousel";
 type Translate = (key: string, params?: Record<string, string | number>) => string;
@@ -77,10 +78,12 @@ function RatingLine({ business }: { business: BusinessCardData }) {
     return <p className="truncate text-[13px] text-ink-500">{t("business_card.new_no_reviews")}</p>;
   }
   return (
-    <p className="flex items-center gap-1 text-[13px]">
-      <Star size={14} className="fill-warn-500 text-warn-500" />
+    <p className="flex items-center gap-1.5 text-[13px]">
+      <RatingBoxes rating={business.averageRating} size="sm" />
       <span className="font-semibold text-ink-900 dark:text-ink-100">{business.averageRating.toFixed(1)}</span>
-      <span className="tabular-nums text-ink-500">({tn("business_card.review_count", business.reviewCount)})</span>
+      <span className="tabular-nums text-ink-500">
+        ({tn("business_card.review_count", business.reviewCount, { n: formatReviewCount(business.reviewCount) })})
+      </span>
     </p>
   );
 }
@@ -201,10 +204,12 @@ function RatingLineWithMeta({ business }: { business: BusinessCardData }) {
     );
   }
   return (
-    <p className="flex items-center gap-1 truncate text-[13px]">
-      <Star size={14} className="shrink-0 fill-warn-500 text-warn-500" />
+    <p className="flex items-center gap-1.5 truncate text-[13px]">
+      <RatingBoxes rating={business.averageRating} size="md" />
       <span className="font-semibold text-ink-900 dark:text-ink-100">{business.averageRating.toFixed(1)}</span>
-      <span className="tabular-nums text-ink-500">({tn("business_card.review_count", business.reviewCount)})</span>
+      <span className="tabular-nums text-ink-500">
+        ({tn("business_card.review_count", business.reviewCount, { n: formatReviewCount(business.reviewCount) })})
+      </span>
       <span className="text-ink-500">
         · {business.categoryName} · {priceLabel}
       </span>

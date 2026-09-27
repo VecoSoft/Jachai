@@ -9,7 +9,7 @@ import { useLanguage } from "@/lib/language-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { avatarColorClass, avatarInitials, cn, focusRing, interactiveTransition, timeAgo, truncateId } from "@/lib/utils";
 import type { ReviewResponse, VoteType } from "@/lib/types";
-import { StarDisplay } from "./star-rating";
+import { RatingBoxes } from "./rating-boxes";
 import { Badge } from "./ui/misc";
 import { IconButton } from "./ui/icon-button";
 import { ReportButton } from "./report-button";
@@ -93,7 +93,7 @@ export function ReviewCard({
             <p className="text-sm font-bold text-ink-900">{displayName}</p>
             <p className="text-xs text-ink-400">{timeAgo(review.createdAt)}</p>
             <div className="mt-1 flex items-center gap-2">
-              <StarDisplay rating={review.rating} size="sm" />
+              <RatingBoxes rating={review.rating} size="xs" />
               {review.visibilityStatus === "NOT_RECOMMENDED" && (
                 <Badge tone="gold">{t("review_card.not_recommended")}</Badge>
               )}

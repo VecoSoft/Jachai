@@ -7,7 +7,7 @@ import { useLanguage } from "@/lib/language-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { timeAgo, truncateId } from "@/lib/utils";
 import type { BusinessResponse, MessageThread, ReviewResponse } from "@/lib/types";
-import { StarDisplay } from "@/components/star-rating";
+import { RatingBoxes } from "@/components/rating-boxes";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { Badge, EmptyState, ErrorBanner, PageSpinner, Pagination } from "@/components/ui/misc";
@@ -175,7 +175,7 @@ export function OwnerReviewsPanel({ business }: { business: BusinessResponse }) 
                 return (
                   <div key={r.id} className="border-b border-ink-100 py-4 last:border-0">
                     <div className="flex items-center gap-2">
-                      <StarDisplay rating={r.rating} size="sm" />
+                      <RatingBoxes rating={r.rating} size="xs" />
                       {r.visibilityStatus !== "RECOMMENDED" && (
                         <Badge tone={r.visibilityStatus === "HIDDEN" ? "rose" : "gold"}>
                           {r.visibilityStatus === "HIDDEN" ? "Hidden by moderation" : "Under review"}

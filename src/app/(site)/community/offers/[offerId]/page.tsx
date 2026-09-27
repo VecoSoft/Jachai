@@ -7,14 +7,14 @@ import { ApiClientError, offerApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useAuthModal } from "@/lib/auth-modal-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
-import { formatDate, formatDateTime, timeUntil } from "@/lib/utils";
+import { formatDate, formatDateTime, formatReviewCount, timeUntil } from "@/lib/utils";
 import { OFFER_AVAILABILITY_LABELS } from "@/lib/offer-constants";
 import type { OfferClaimResponse, OfferResponse } from "@/lib/types";
 import { OfferTypeBadge } from "@/components/offer-type-badge";
 import { RedemptionCodeCard } from "@/components/redemption-code-card";
 import { ReportButton } from "@/components/report-button";
 import { VerifiedBadge } from "@/components/verified-badge";
-import { StarDisplay } from "@/components/star-rating";
+import { RatingBoxes } from "@/components/rating-boxes";
 import { Badge, EmptyState, ErrorBanner, PageSpinner } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 
@@ -207,9 +207,9 @@ export default function OfferDetailPage() {
             <p className="text-sm font-semibold text-ink-900">{offer.businessName}</p>
             {offer.businessAverageRating != null && (
               <div className="mt-1.5 flex items-center gap-1.5">
-                <StarDisplay rating={offer.businessAverageRating} size="sm" />
+                <RatingBoxes rating={offer.businessAverageRating} size="sm" />
                 <span className="text-xs font-bold text-ink-900">{offer.businessAverageRating.toFixed(1)}</span>
-                <span className="text-[11px] text-ink-400">({offer.businessReviewCount})</span>
+                <span className="text-[11px] text-ink-400">({formatReviewCount(offer.businessReviewCount)})</span>
               </div>
             )}
             <p className="mt-1.5 text-xs text-ink-500">

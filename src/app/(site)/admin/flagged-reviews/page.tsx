@@ -7,7 +7,7 @@ import { AdminNav } from "@/components/admin-nav";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { formatDateTime, truncateId } from "@/lib/utils";
 import type { FakeReviewSignal, Review, VisibilityStatus } from "@/lib/types";
-import { StarDisplay } from "@/components/star-rating";
+import { RatingBoxes } from "@/components/rating-boxes";
 import { Badge, EmptyState, ErrorBanner, PageSpinner, Pagination } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 
@@ -124,7 +124,7 @@ function FlaggedReviewsContent() {
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <div className="flex items-center gap-2">
-                      <StarDisplay rating={r.rating} size="sm" />
+                      <RatingBoxes rating={r.rating} size="xs" />
                       <Badge tone={r.suspicionScore > 70 ? "rose" : "gold"}>
                         Suspicion {r.suspicionScore}/100
                       </Badge>

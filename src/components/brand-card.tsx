@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import type { BusinessResponse } from "@/lib/types";
-import { StarDisplay } from "./star-rating";
+import { formatReviewCount } from "@/lib/utils";
+import { RatingBoxes } from "./rating-boxes";
 import { Card } from "./ui/misc";
 
 /**
@@ -57,9 +58,11 @@ export function BrandCard({ business }: { business: BusinessResponse }) {
           </h3>
 
           <div className="mt-2 flex items-center gap-2">
-            <StarDisplay rating={rating} />
+            <RatingBoxes rating={rating} size="sm" />
             <span className="text-base font-bold text-ink-900">{rating.toFixed(1)}</span>
-            <span className="text-sm text-ink-400">({tn("business_card.rating_count", business.reviewCount)})</span>
+            <span className="text-sm text-ink-400">
+              ({tn("business_card.rating_count", business.reviewCount, { n: formatReviewCount(business.reviewCount) })})
+            </span>
           </div>
         </div>
       </Link>

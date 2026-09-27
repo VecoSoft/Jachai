@@ -150,9 +150,10 @@ export function avatarColorClass(seed: string): string {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
-export function ratingToStars(rating: number): string {
-  const full = Math.round(rating);
-  return "★".repeat(full) + "☆".repeat(Math.max(0, 5 - full));
+/** 1,234 -> "1.2k"; below 1000, the plain number. Used next to RatingBoxes for a review/rating count. */
+export function formatReviewCount(count: number): string {
+  if (count < 1000) return String(count);
+  return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
 }
 
 const EARTH_RADIUS_KM = 6371;

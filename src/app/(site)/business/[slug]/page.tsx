@@ -15,7 +15,7 @@ import type { BusinessResponse, ReviewResponse, ReviewSortOption } from "@/lib/t
 import { modulesForKind, moduleHasData, type ModuleKey } from "@/lib/category-modules";
 import { canBook, canSellDirect } from "@/lib/commerce";
 import { trackEvent, trackProfileView } from "@/lib/analytics";
-import { StarDisplay } from "@/components/star-rating";
+import { RatingBoxes } from "@/components/rating-boxes";
 import { VerifiedBadge } from "@/components/verified-badge";
 import { MapPreview } from "@/components/map-preview";
 import { ShareButton } from "@/components/share-button";
@@ -534,10 +534,14 @@ export default function BusinessDetailPage() {
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-4 sm:gap-6 mb-2">
-              <div className="text-center">
-                <p className="font-display text-3xl font-extrabold text-ink-900">{business.averageRating.toFixed(1)}</p>
-                <StarDisplay rating={business.averageRating} />
-              </div>
+              {business.reviewCount === 0 ? (
+                <p className="text-sm text-ink-500">New · no reviews yet</p>
+              ) : (
+                <div className="text-center">
+                  <p className="font-display text-3xl font-extrabold text-ink-900">{business.averageRating.toFixed(1)}</p>
+                  <RatingBoxes rating={business.averageRating} size="md" />
+                </div>
+              )}
               <RatingBreakdownChart businessId={business.id} />
             </div>
 

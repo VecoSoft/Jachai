@@ -5,7 +5,8 @@ import { businessApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import type { BusinessResponse } from "@/lib/types";
-import { StarDisplay } from "@/components/star-rating";
+import { formatReviewCount } from "@/lib/utils";
+import { RatingBoxes } from "@/components/rating-boxes";
 import { VerifiedBadge } from "@/components/verified-badge";
 import { ClaimBusinessModal } from "@/components/claim-business-modal";
 import { Button } from "@/components/ui/button";
@@ -28,9 +29,9 @@ function ResultCard({ business, onClaim }: { business: BusinessResponse; onClaim
           {business.categoryName} · {business.areaName}, {business.cityName}
         </p>
         <div className="mt-1 flex items-center gap-1.5">
-          <StarDisplay rating={business.averageRating} size="sm" />
+          <RatingBoxes rating={business.averageRating} size="sm" />
           <span className="text-xs text-ink-500">
-            {business.averageRating.toFixed(1)} ({business.reviewCount})
+            {business.averageRating.toFixed(1)} ({formatReviewCount(business.reviewCount)})
           </span>
         </div>
       </div>
