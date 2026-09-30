@@ -60,6 +60,14 @@ function buildNavGroups(
       ],
     },
     {
+      // V58 business promotion: Design Studio + results/boosts.
+      title: "Promote",
+      items: [
+        { label: "Create promotion", href: `${base}/promote` },
+        { label: "Promotions", href: `${base}/promotions` },
+      ],
+    },
+    {
       title: "Content",
       items: [
         { label: "Business info", href: `${base}/edit` },

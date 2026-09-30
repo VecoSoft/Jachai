@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BarChart3, Clock, ImagePlus, Plus, Store, X } from "lucide-react";
-import { communityApi, uploadFileToPresignedUrl } from "@/lib/api";
+import Link from "next/link";
+import { businessApi, communityApi, promoApi, uploadFileToPresignedUrl } from "@/lib/api";
+import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { useAuthModal } from "@/lib/auth-modal-context";
 import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
@@ -17,7 +19,7 @@ import { errorMessage, useToast } from "@/lib/toast-context";
 import { communityWriteBlock, postTypeEnabled, selectableTopics, useCommunitySettings, useCommunityStanding } from "@/lib/community-settings";
 import { ApiClientError } from "@/lib/api";
 import { avatarColorClass, avatarInitials, cn } from "@/lib/utils";
-import type { CommunityMentionedBusinessSummary, CommunityPostResponse, CommunityPostType, CommunityTopic } from "@/lib/types";
+import type { BusinessResponse, CommunityMentionedBusinessSummary, CommunityPostResponse, CommunityPostType, CommunityTopic } from "@/lib/types";
 import { CommunityMarkdownToolbar } from "./community-markdown-toolbar";
 import { CommunityRestrictionNotice, CommunityRules } from "./community-moderation";
 import { Button } from "./ui/button";
@@ -46,6 +48,7 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
   const { openLogin } = useAuthModal();
   const { openModal: openUsernameModal } = useCommunityUsernameModal();
   const { show } = useToast();
+  const { t } = useLanguage();
 
   const [expanded, setExpanded] = useState(false);
   const [body, setBody] = useState("");
@@ -61,7 +64,20 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // V58 "Post as" identity: null = the member's own u/username, otherwise one of their businesses.
+  const [myBusinesses, setMyBusinesses] = useState<BusinessResponse[]>([]);
+  const [postAs, setPostAs] = useState<string | null>(null);
+  const [businessPostType, setBusinessPostType] = useState<"GENERAL" | "ANNOUNCEMENT">("GENERAL");
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (user?.role !== "BUSINESS_OWNER") {
+      setMyBusinesses([]);
+      return;
+    }
+    businessApi.mine().then(setMyBusinesses).catch(() => setMyBusinesses([]));
+  }, [user?.role]);
+  const postAsBusiness = myBusinesses.find((b) => b.id === postAs) ?? null;
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   // Admin-managed rules (server-enforced; mirrored here for UX).
@@ -172,6 +188,12 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
       return;
     }
     if (!profile?.communityUsername) {
+      // A business owner without a member username can still post as their business.
+      if (myBusinesses.length > 0) {
+        setPostAs(myBusinesses[0].id);
+        setExpanded(true);
+        return;
+      }
       openUsernameModal(() => setExpanded(true));
       return;
     }
@@ -193,6 +215,31 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
       return;
     }
     setSubmitting(true);
+    if (postAs) {
+      // Posting as a business goes through the promotion rules (weekly limit, banned categories,
+      // own-links-only, optional approval) — see promo.BusinessPostService.
+      try {
+        const post = await promoApi.createPost(postAs, {
+          type: businessPostType,
+          title: null,
+          body: trimmedBody,
+          creativeId: null,
+          offerId: null,
+          menuItemId: null,
+          eventStart: null,
+          eventEnd: null,
+          publish: true,
+        });
+        onPosted(post);
+        reset();
+        show(post.status === "PENDING" ? t("promo.studio.waiting_review") : t("promo.studio.posted"), "success");
+      } catch (err) {
+        show(errorMessage(err), "error");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
     try {
       const post = await communityApi.create({
         title: null,
@@ -295,7 +342,25 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
                 <h2 id="community-composer-heading" className="font-display text-lg font-bold text-ink-900">
                   Create a Post
                 </h2>
-                {profile?.communityUsername && <p className="text-xs text-ink-400">Posting as u/{profile.communityUsername}</p>}
+                {myBusinesses.length > 0 ? (
+                  <label className="flex items-center gap-1 text-xs text-ink-500">
+                    {t("promo.post_as")}
+                    <select
+                      value={postAs ?? ""}
+                      onChange={(e) => setPostAs(e.target.value || null)}
+                      className="min-h-9 rounded-lg border border-ink-200 bg-surface px-2 text-base font-medium text-ink-800 sm:text-xs"
+                    >
+                      {profile?.communityUsername && <option value="">u/{profile.communityUsername}</option>}
+                      {myBusinesses.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  profile?.communityUsername && <p className="text-xs text-ink-400">Posting as u/{profile.communityUsername}</p>
+                )}
               </div>
             </div>
             <button
@@ -308,6 +373,32 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
             </button>
           </div>
 
+          {postAsBusiness && (
+            <div className="mt-4 space-y-2 rounded-xl border border-ink-100 bg-ink-50/60 p-3 text-xs text-ink-600">
+              <p>{t("promo.post_as_business_note", { name: postAsBusiness.name })}</p>
+              <div className="flex flex-wrap gap-2">
+                {(["GENERAL", "ANNOUNCEMENT"] as const).map((bt) => (
+                  <button
+                    key={bt}
+                    type="button"
+                    onClick={() => setBusinessPostType(bt)}
+                    aria-pressed={businessPostType === bt}
+                    className={cn(
+                      "min-h-9 rounded-full px-3 font-semibold",
+                      businessPostType === bt ? "bg-ink-900 text-white" : "text-ink-500 hover:text-ink-800"
+                    )}
+                  >
+                    {t(`promo.type.${bt}`)}
+                  </button>
+                ))}
+                <Link href={`/owner/${postAsBusiness.id}/promote`} className="ml-auto inline-flex min-h-9 items-center font-semibold text-crimson-700 hover:underline">
+                  {t("promo.open_studio")}
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {!postAs && (
           <div className="mt-4 flex gap-1 rounded-full bg-ink-50 p-1">
             {composerTypes.map((t) => (
               <button
@@ -328,6 +419,7 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
               </button>
             ))}
           </div>
+          )}
 
           <div className="mt-3 overflow-hidden rounded-xl border border-ink-200 bg-ink-50 transition-colors duration-150 focus-within:border-crimson-300 focus-within:ring-2 focus-within:ring-crimson-500/20">
             <CommunityMarkdownToolbar textareaRef={bodyRef} onChange={(next) => setBody(next.slice(0, BODY_MAX))} />
@@ -355,6 +447,7 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
             </div>
           </div>
 
+          {!postAs && (<>
           <input
             ref={photoInputRef}
             type="file"
@@ -540,6 +633,7 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
               </div>
             )}
           </div>
+          </>)}
 
           <CommunityRules variant="composer" />
 

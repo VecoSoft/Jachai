@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Creative PNG rendering (src/lib/promo-render.tsx) uses a native rasterizer and a WASM text
+  // shaper — load them with Node's require instead of bundling them.
+  experimental: {
+    serverComponentsExternalPackages: ["@resvg/resvg-js", "harfbuzzjs", "satori"],
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**" },

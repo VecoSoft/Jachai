@@ -20,6 +20,8 @@ import { QuestionsForYouWidget } from "@/components/questions-for-you-widget";
 import { Reveal } from "@/components/reveal";
 import { SearchUnderstanding } from "@/components/search-understanding";
 import { SmartSearchBar } from "@/components/smart-search-bar";
+import { FeaturedNearby, SponsoredBusinessCard } from "@/components/promo/featured-nearby";
+import { hiddenAds } from "@/lib/promo-session";
 import { EmptyState, ErrorBanner, Pagination } from "@/components/ui/misc";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -70,6 +72,8 @@ export default function HomePage() {
   // Set only for text searches (smart search); plain browsing/filtering keeps using /businesses/search.
   const [smartMeta, setSmartMeta] = useState<Omit<SmartSearchResponse, "results"> | null>(null);
   const [popular, setPopular] = useState<SearchSuggestion[]>([]);
+  // "Hide this ad" on the sponsored search result — also remembered for future searches.
+  const [sponsoredHidden, setSponsoredHidden] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -151,6 +155,7 @@ export default function HomePage() {
         setTotalPages(page.totalPages);
         setTotalElements(page.totalElements);
         setSmartMeta(meta);
+        setSponsoredHidden(Boolean(meta?.sponsored && hiddenAds().has(meta.sponsored.boostId)));
         rememberBusinesses(page.content);
       })
       .catch((err) => !cancelled && setError(errorMessage(err)))
@@ -329,6 +334,11 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* V58: paid, clearly labelled "Sponsored" carousel — renders nothing when no boost is eligible. */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+        <FeaturedNearby />
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Reveal>
           <div className="mx-auto max-w-md py-4">
@@ -380,6 +390,13 @@ export default function HomePage() {
                   onClear={() => runSearch("")}
                   onSearch={runSearch}
                 />
+              )}
+              {/* V58: at most one sponsored result, pinned ABOVE the organic results (which stay
+                  exactly as the search returned them) and always labelled. */}
+              {query && smartMeta?.sponsored && !sponsoredHidden && (
+                <div className="mb-5 max-w-xs">
+                  <SponsoredBusinessCard item={smartMeta.sponsored} source="SEARCH" onHidden={() => setSponsoredHidden(true)} />
+                </div>
               )}
               <p key={totalElements} className="animate-fade-in text-sm font-medium text-ink-500 mb-4">
                 {totalElements} businesses found

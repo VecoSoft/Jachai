@@ -6,6 +6,8 @@ import { communityApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
+import { useUserLocation } from "@/lib/location-context";
+import { hiddenAds } from "@/lib/promo-session";
 import { cn } from "@/lib/utils";
 import { COMMUNITY_FEED_TYPE_FILTERS, COMMUNITY_SORT_OPTIONS } from "@/lib/community-constants";
 import { selectableTopics, useCommunitySettings } from "@/lib/community-settings";
@@ -63,27 +65,44 @@ function CommunityPageInner() {
     }
   }, [user, profile, openUsernameModal]);
 
+  // Sponsored-slot targeting only uses location the viewer already granted (never prompts here).
+  const { status: locationStatus, coords } = useUserLocation();
+  const viewerLat = locationStatus === "granted" && coords ? Math.round(coords.lat * 1000) / 1000 : undefined;
+  const viewerLng = locationStatus === "granted" && coords ? Math.round(coords.lng * 1000) / 1000 : undefined;
+
+  const withoutHiddenAds = useCallback((list: CommunityPostResponse[]) => {
+    const hidden = hiddenAds();
+    return list.filter((p) => !p.sponsored || !hidden.has(p.sponsored.boostId));
+  }, []);
+
   const loadFirstPage = useCallback(() => {
     setLoading(true);
     setError(null);
     communityApi
-      .feed({ topic: topic ?? undefined, postType: postType ?? undefined, sort, page: 0 })
+      .feed({ topic: topic ?? undefined, postType: postType ?? undefined, sort, page: 0, lat: viewerLat, lng: viewerLng })
       .then((res) => {
-        setPosts(res.content);
+        setPosts(withoutHiddenAds(res.content));
         setPage(res.page);
         setTotalPages(res.totalPages);
       })
       .catch((err) => setError(errorMessage(err)))
       .finally(() => setLoading(false));
-  }, [topic, postType, sort]);
+  }, [topic, postType, sort, viewerLat, viewerLng, withoutHiddenAds]);
 
   useEffect(loadFirstPage, [loadFirstPage]);
 
   async function loadMore() {
     setLoadingMore(true);
     try {
-      const res = await communityApi.feed({ topic: topic ?? undefined, postType: postType ?? undefined, sort, page: page + 1 });
-      setPosts((prev) => [...prev, ...res.content]);
+      const res = await communityApi.feed({
+        topic: topic ?? undefined,
+        postType: postType ?? undefined,
+        sort,
+        page: page + 1,
+        lat: viewerLat,
+        lng: viewerLng,
+      });
+      setPosts((prev) => [...prev, ...withoutHiddenAds(res.content)]);
       setPage(res.page);
       setTotalPages(res.totalPages);
     } catch (err) {
@@ -158,8 +177,14 @@ function CommunityPageInner() {
         )}
         {!loading && !error && posts.length > 0 && (
           <div className="divide-y divide-ink-100">
-            {posts.map((post) => (
-              <CommunityPostCard key={post.id} post={post} onChanged={handleChanged} onDeleted={handleDeleted} />
+            {posts.map((post, i) => (
+              <CommunityPostCard
+                // A sponsored copy can sit beside the same post's organic copy — key them apart.
+                key={post.sponsored ? `sponsored-${post.sponsored.boostId}-${i}` : post.id}
+                post={post}
+                onChanged={handleChanged}
+                onDeleted={handleDeleted}
+              />
             ))}
           </div>
         )}

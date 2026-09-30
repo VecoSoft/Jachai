@@ -115,6 +115,24 @@ import type {
   VisibilityStatus,
   VoteType,
 } from "./types";
+import type {
+  BoostPackageInfo,
+  BoostView,
+  BusinessPostBody,
+  CaptionResult,
+  CreativeData,
+  CreativeView,
+  PaymentOption,
+  PromoAnalytics,
+  PromoRenderModel,
+  PromoSharePayload,
+  PromoTemplateKey,
+  SavedCreative,
+  SponsoredBusiness,
+  StudioData,
+  BusinessPostType,
+} from "./types";
+import { attributionQuery, promoSessionHeaders } from "./promo-session";
 
 export class ApiClientError extends Error {
   status: number;
@@ -174,6 +192,7 @@ interface RequestOptions {
   auth?: boolean; // default true — attach Authorization header if a token exists
   isRetry?: boolean;
   rawBody?: boolean; // send `body` as-is (already JSON.stringify'd) instead of re-stringifying
+  headers?: Record<string, string>;
 }
 
 function buildQuery(query?: RequestOptions["query"]): string {
@@ -191,7 +210,7 @@ function buildQuery(query?: RequestOptions["query"]): string {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, query, auth = true, isRetry = false, rawBody = false } = options;
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...(options.headers ?? {}) };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth) {
     const token = getStoredAccessToken();
@@ -339,6 +358,7 @@ export const businessApi = {
     request<SmartSearchResponse>("/api/v1/businesses/smart-search", {
       auth: false,
       query: { ...params },
+      headers: promoSessionHeaders(),
     }),
 
   /** Dropdown rows for the search box — cheap, cacheable; call debounced. */
@@ -475,6 +495,10 @@ export interface CommunityFeedParams {
   areaId?: string;
   page?: number;
   size?: number;
+  /** V58 sponsored targeting — only what the viewer chose to share. */
+  viewerAreaId?: string;
+  lat?: number;
+  lng?: number;
 }
 
 export const communityApi = {
@@ -497,9 +521,15 @@ export const communityApi = {
   // No `auth: false` on these reads (unlike the old Facebook-feed implementation) — they're
   // still public/permitAll on the backend for a logged-out visitor, but a logged-in viewer's
   // token must go along so the server can resolve myVote and (for tab=FOLLOWING) who's asking.
+  /**
+   * The feed. The server may insert at most one "Sponsored" business post after every N organic
+   * posts (never on Following or post-type tabs); `viewerAreaId`/`lat`/`lng` are only what the
+   * viewer already chose to share, and the promo session header powers the per-viewer frequency cap.
+   */
   feed: (params: CommunityFeedParams = {}) =>
     request<PageResponse<CommunityPostResponse>>("/api/v1/community/posts", {
       query: { page: 0, size: 20, ...params },
+      headers: promoSessionHeaders(),
     }),
 
   get: (postId: string) => request<CommunityPostResponse>(`/api/v1/community/posts/${postId}`),
@@ -542,10 +572,11 @@ export const communityApi = {
       query: { page, size },
     }),
 
-  addComment: (postId: string, content: string, parentCommentId: string | null = null) =>
+  /** `asBusinessId`: reply as that business — only accepted on the business's own posts. */
+  addComment: (postId: string, content: string, parentCommentId: string | null = null, asBusinessId: string | null = null) =>
     request<CommunityCommentResponse>(`/api/v1/community/posts/${postId}/comments`, {
       method: "POST",
-      body: { content, parentCommentId },
+      body: { content, parentCommentId, asBusinessId },
     }),
 
   removeComment: (postId: string, commentId: string) =>
@@ -719,7 +750,12 @@ export const offerApi = {
 
   cancel: (offerId: string) => request<void>(`/api/v1/offers/${offerId}`, { method: "DELETE" }),
 
-  claim: (offerId: string) => request<OfferClaimResponse>(`/api/v1/offers/${offerId}/claim`, { method: "POST" }),
+  /** Carries promo attribution when the visitor arrived from a business post / share link (V58). */
+  claim: (offerId: string, businessId?: string) =>
+    request<OfferClaimResponse>(`/api/v1/offers/${offerId}/claim`, {
+      method: "POST",
+      query: attributionQuery({ offerId, businessId }),
+    }),
 
   /** Business-owner/staff action — looks up a customer's claim by its redemption code. */
   redeem: (redemptionCode: string) =>
@@ -1025,7 +1061,7 @@ export const commerceApi = {
 
 export const orderApi = {
   place: (businessId: string, body: PlaceOrderBody) =>
-    request<Order>(`/api/v1/businesses/${businessId}/orders`, { method: "POST", body }),
+    request<Order>(`/api/v1/businesses/${businessId}/orders`, { method: "POST", body, query: attributionQuery({ businessId }) }),
   mine: (page = 0, size = 20) =>
     request<PageResponse<Order>>("/api/v1/orders/mine", { query: { page, size } }),
   get: (id: string) => request<Order>(`/api/v1/orders/${id}`),
@@ -1049,7 +1085,7 @@ export const orderApi = {
 // ---------------------------------------------------------------------------
 export const bookingApi = {
   place: (businessId: string, body: PlaceBookingBody) =>
-    request<Booking>(`/api/v1/businesses/${businessId}/bookings`, { method: "POST", body }),
+    request<Booking>(`/api/v1/businesses/${businessId}/bookings`, { method: "POST", body, query: attributionQuery({ businessId }) }),
   /** Public — staffId omitted means "any available staff". */
   availability: (businessId: string, serviceId: string, staffId: string | null, date: string) =>
     request<AvailabilityResponse>(`/api/v1/businesses/${businessId}/bookings/availability`, {
@@ -1143,3 +1179,65 @@ export async function uploadFileToPresignedUrl(uploadUrl: string, file: File): P
     return false;
   }
 }
+// ---------------------------------------------------------------------------
+// Business promotion (V58)
+// ---------------------------------------------------------------------------
+export interface CreativeRequestBody {
+  templateKey: PromoTemplateKey;
+  data: CreativeData;
+}
+
+export interface CaptionRequestBody {
+  type: BusinessPostType;
+  offerId?: string | null;
+  menuItemId?: string | null;
+  eventTitle?: string | null;
+  eventStart?: string | null;
+  tone?: "friendly" | "premium" | "urgent";
+}
+
+export const promoApi = {
+  // ---- Design Studio (owner) ----
+  studio: (businessId: string) => request<StudioData>(`/api/v1/promo/businesses/${businessId}/studio`),
+  previewModel: (businessId: string, body: CreativeRequestBody) =>
+    request<PromoRenderModel>(`/api/v1/promo/businesses/${businessId}/render-model`, { method: "POST", body }),
+  saveCreative: (businessId: string, body: CreativeRequestBody) =>
+    request<SavedCreative>(`/api/v1/promo/businesses/${businessId}/creatives`, { method: "POST", body }),
+  updateCreative: (creativeId: string, body: CreativeRequestBody) =>
+    request<SavedCreative>(`/api/v1/promo/creatives/${creativeId}`, { method: "PUT", body }),
+  markRendered: (creativeId: string, keys: { squareKey: string; storyKey: string; ogKey: string }) =>
+    request<CreativeView>(`/api/v1/promo/creatives/${creativeId}/rendered`, { method: "POST", body: keys }),
+  captions: (businessId: string, body: CaptionRequestBody) =>
+    request<CaptionResult>(`/api/v1/promo/businesses/${businessId}/captions`, { method: "POST", body }),
+
+  // ---- Business posts ----
+  createPost: (businessId: string, body: BusinessPostBody) =>
+    request<CommunityPostResponse>(`/api/v1/promo/businesses/${businessId}/posts`, { method: "POST", body }),
+  updatePost: (postId: string, body: BusinessPostBody) =>
+    request<CommunityPostResponse>(`/api/v1/promo/posts/${postId}`, { method: "PUT", body }),
+  publishPost: (postId: string) => request<CommunityPostResponse>(`/api/v1/promo/posts/${postId}/publish`, { method: "POST" }),
+  deletePost: (postId: string) => request<void>(`/api/v1/promo/posts/${postId}`, { method: "DELETE" }),
+  myPosts: (businessId: string) => request<CommunityPostResponse[]>(`/api/v1/promo/businesses/${businessId}/posts`),
+  interested: (postId: string) =>
+    request<{ interestedCount: number }>(`/api/v1/promo/posts/${postId}/interested`, { method: "POST" }),
+
+  // ---- Boost ----
+  packages: () =>
+    request<{ packages: BoostPackageInfo[]; paymentOptions: PaymentOption[]; boostsEnabled: boolean }>("/api/v1/promo/boost-packages"),
+  createBoost: (postId: string, body: { packageId: string; targetAreaIds: string[] | null; radiusKm: number | null; startDate: string }) =>
+    request<BoostView>(`/api/v1/promo/posts/${postId}/boosts`, { method: "POST", body }),
+  pay: (boostId: string, body: { method: "BKASH" | "NAGAD"; transactionId: string }) =>
+    request<BoostView>(`/api/v1/promo/boosts/${boostId}/payment`, { method: "POST", body }),
+  pauseBoost: (boostId: string) => request<BoostView>(`/api/v1/promo/boosts/${boostId}/pause`, { method: "POST" }),
+  resumeBoost: (boostId: string) => request<BoostView>(`/api/v1/promo/boosts/${boostId}/resume`, { method: "POST" }),
+  boosts: (businessId: string) => request<BoostView[]>(`/api/v1/promo/businesses/${businessId}/boosts`),
+
+  // ---- Analytics ----
+  analytics: (businessId: string, days = 30) =>
+    request<PromoAnalytics>(`/api/v1/promo/businesses/${businessId}/analytics`, { query: { days } }),
+
+  // ---- Public ----
+  share: (postId: string) => request<PromoSharePayload>(`/api/v1/promo/public/posts/${postId}/share`, { auth: false }),
+  featuredNearby: (params: { areaId?: string; lat?: number; lng?: number }) =>
+    request<SponsoredBusiness[]>("/api/v1/promo/public/featured-nearby", { auth: false, query: { ...params }, headers: promoSessionHeaders() }),
+};

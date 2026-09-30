@@ -80,7 +80,7 @@ export default function OfferDetailPage() {
     }
     setClaiming(true);
     try {
-      const res = await offerApi.claim(offer.id);
+      const res = await offerApi.claim(offer.id, offer.businessId);
       setClaim(res);
       show("Offer claimed successfully.", "success");
       load();

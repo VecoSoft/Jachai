@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { BadgeCheck, Lock, Store } from "lucide-react";
-import { ApiClientError, communityApi } from "@/lib/api";
+import { ApiClientError, businessApi, communityApi } from "@/lib/api";
+import { BusinessPostCard } from "@/components/promo/business-post-card";
 import { communityWriteBlock, topicLabel, useCommunitySettings, useCommunityStanding } from "@/lib/community-settings";
 import { useAuth } from "@/lib/auth-context";
 import { useAuthModal } from "@/lib/auth-modal-context";
@@ -12,6 +13,7 @@ import { useCommunityUsernameModal } from "@/lib/community-username-modal-contex
 import { applyVoteDelta } from "@/lib/community-vote";
 import { COMMUNITY_POST_TYPE_META } from "@/lib/community-constants";
 import { errorMessage, useToast } from "@/lib/toast-context";
+import { useLanguage } from "@/lib/language-context";
 import { cn } from "@/lib/utils";
 import type { CommunityCommentResponse, CommunityPostResponse, CommunityPostVoteType } from "@/lib/types";
 import { CommunityCommentThread } from "@/components/community-comment-thread";
@@ -43,6 +45,7 @@ export default function CommunityPostDetailPage() {
   const { show } = useToast();
   const settings = useCommunitySettings();
   const { standing, refresh: refreshStanding } = useCommunityStanding();
+  const { t } = useLanguage();
 
   const [post, setPost] = useState<CommunityPostResponse | null>(null);
   const [comments, setComments] = useState<CommunityCommentResponse[]>([]);
@@ -66,6 +69,21 @@ export default function CommunityPostDetailPage() {
   }, [postId]);
 
   useEffect(load, [load]);
+
+  // V58: the owner of a business post may reply AS that business (own posts only — enforced server-side).
+  const [ownsPostBusiness, setOwnsPostBusiness] = useState(false);
+  const [replyAsBusiness, setReplyAsBusiness] = useState(true);
+  const postBusinessId = post?.business?.id ?? null;
+  useEffect(() => {
+    if (!postBusinessId || user?.role !== "BUSINESS_OWNER") {
+      setOwnsPostBusiness(false);
+      return;
+    }
+    businessApi
+      .mine()
+      .then((mine) => setOwnsPostBusiness(mine.some((b) => b.id === postBusinessId)))
+      .catch(() => setOwnsPostBusiness(false));
+  }, [postBusinessId, user?.role]);
 
   async function handleVote(type: CommunityPostVoteType) {
     if (!post) return;
@@ -91,7 +109,7 @@ export default function CommunityPostDetailPage() {
       openLogin();
       return;
     }
-    if (!profile?.communityUsername) {
+    if (!(replyAsBusiness && ownsPostBusiness) && !profile?.communityUsername) {
       openUsernameModal();
       return;
     }
@@ -103,13 +121,14 @@ export default function CommunityPostDetailPage() {
       openLogin();
       return;
     }
-    if (!profile?.communityUsername) {
+    const asBusiness = replyAsBusiness && ownsPostBusiness && post.business ? post.business.id : null;
+    if (!asBusiness && !profile?.communityUsername) {
       openUsernameModal();
       return;
     }
     setPostingComment(true);
     try {
-      const comment = await communityApi.addComment(post.id, commentText.trim());
+      const comment = await communityApi.addComment(post.id, commentText.trim(), null, asBusiness);
       setComments((prev) => [...prev, comment]);
       setCommentText("");
       // A comment held for review isn't counted (or shown to others) until it's approved.
@@ -195,6 +214,12 @@ export default function CommunityPostDetailPage() {
         ← Back to Community
       </Link>
 
+      {post.business ? (
+        // V58: a post published as a business — business identity, creative and CTA.
+        <div className="mt-4 rounded-xl border border-ink-100 bg-surface px-5">
+          <BusinessPostCard post={post} detail onChanged={setPost} onDeleted={() => router.push("/community")} />
+        </div>
+      ) : (
       <div className="mt-4 rounded-xl border border-ink-100 bg-surface p-5 transition-shadow duration-200 hover:shadow-card">
         <div className="flex items-start justify-between gap-2">
           <PostHeader author={post.author} area={post.area} createdAt={post.createdAt} size="md" />
@@ -263,6 +288,7 @@ export default function CommunityPostDetailPage() {
           />
         </div>
       </div>
+      )}
 
       <div className="mt-6">
         <h2 className="text-sm font-bold text-ink-900">
@@ -286,7 +312,19 @@ export default function CommunityPostDetailPage() {
         ) : isQuestion && post.questionStatus === "CLOSED" ? (
           <p className="mt-2 text-sm text-ink-400">This question is closed to new answers.</p>
         ) : user ? (
-          <div className="mt-2 flex items-start gap-2">
+          <div className="mt-2 flex flex-col gap-1.5">
+          {ownsPostBusiness && post.business && (
+            <label className="inline-flex min-h-11 items-center gap-2 text-sm text-ink-600">
+              <input
+                type="checkbox"
+                checked={replyAsBusiness}
+                onChange={(e) => setReplyAsBusiness(e.target.checked)}
+                className="h-4 w-4 accent-crimson-600"
+              />
+              {t("promo.reply_as", { name: post.business.name })}
+            </label>
+          )}
+          <div className="flex items-start gap-2">
             <input
               ref={commentInputRef}
               value={commentText}
@@ -301,6 +339,7 @@ export default function CommunityPostDetailPage() {
             <Button size="sm" onClick={submitComment} loading={postingComment} disabled={!commentText.trim()}>
               {isQuestion ? "Post Answer" : "Comment"}
             </Button>
+          </div>
           </div>
         ) : (
           <button type="button" onClick={openLogin} className="mt-2 text-sm text-crimson-700 hover:underline">

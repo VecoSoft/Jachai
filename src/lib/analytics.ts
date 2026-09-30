@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "./config";
+import { trackPromoFollowUp } from "./promo-session";
 import type { BusinessEventType } from "./types";
 
 /**
@@ -70,9 +71,18 @@ function post(businessId: string, eventType: BusinessEventType): void {
   }
 }
 
+/** Business-page actions that also count as a promotion follow-up when the visitor came from one (V58). */
+const PROMO_FOLLOW_UP: Partial<Record<BusinessEventType, "CALL" | "DIRECTIONS" | "MESSAGE">> = {
+  PHONE_CLICK: "CALL",
+  DIRECTIONS_CLICK: "DIRECTIONS",
+  WHATSAPP_CLICK: "MESSAGE",
+};
+
 /** Track a deliberate interaction (phone / WhatsApp / directions / website click). */
 export function trackEvent(businessId: string, eventType: BusinessEventType): void {
   post(businessId, eventType);
+  const promo = PROMO_FOLLOW_UP[eventType];
+  if (promo) trackPromoFollowUp(businessId, promo);
 }
 
 /**
@@ -91,4 +101,5 @@ export function trackProfileView(businessId: string): void {
     /* storage unavailable — fall through and still record the view */
   }
   post(businessId, "PROFILE_VIEW");
+  trackPromoFollowUp(businessId, "PROFILE_VISIT");
 }

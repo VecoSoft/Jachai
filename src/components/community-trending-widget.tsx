@@ -21,8 +21,9 @@ export function CommunityTrendingWidget({ className }: { className?: string }) {
 
   useEffect(() => {
     communityApi
-      .feed({ sort: "TOP", size: 5 })
-      .then((res) => setPosts(res.content))
+      .feed({ sort: "TOP", size: 10 })
+      // Member posts only — business posts appear (labelled) in the feed, never in this unlabelled rail.
+      .then((res) => setPosts(res.content.filter((p) => !p.business).slice(0, 5)))
       .catch(() => setPosts([]))
       .finally(() => setLoading(false));
   }, []);

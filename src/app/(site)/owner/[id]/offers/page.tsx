@@ -11,6 +11,7 @@ import { ModulePhotoInput } from "@/components/category-modules/module-photo-inp
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { Badge, EmptyState, PageSpinner } from "@/components/ui/misc";
+import { PromoteOfferSheet } from "@/components/promo/promote-offer-sheet";
 
 interface Draft {
   title: string;
@@ -112,6 +113,7 @@ export default function OwnerOffersPage() {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [promoteOffer, setPromoteOffer] = useState<OfferResponse | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -184,15 +186,13 @@ export default function OwnerOffersPage() {
         body = { ...body, menuItemId: newItem.id };
       }
 
-      if (editingId) {
-        await offerApi.update(editingId, body);
-      } else {
-        await offerApi.create(body);
-      }
+      const saved = editingId ? await offerApi.update(editingId, body) : await offerApi.create(body);
       cancelForm();
       load();
       loadMenuItems();
       show("Offer saved", "success");
+      // V58: a newly live offer → offer to promote it in the community right away.
+      if (!editingId && saved?.status === "ACTIVE") setPromoteOffer(saved);
     } catch (err) {
       show(errorMessage(err), "error");
     } finally {
@@ -203,9 +203,10 @@ export default function OwnerOffersPage() {
   async function submitForApproval(id: string) {
     setBusyId(id);
     try {
-      await offerApi.submit(id);
+      const published = await offerApi.submit(id);
       show("Offer published", "success");
       load();
+      if (published?.status === "ACTIVE") setPromoteOffer(published);
     } catch (err) {
       show(errorMessage(err), "error");
     } finally {
@@ -384,6 +385,7 @@ export default function OwnerOffersPage() {
 
   return (
     <div>
+      {promoteOffer && <PromoteOfferSheet businessId={business.id} offer={promoteOffer} onClose={() => setPromoteOffer(null)} />}
       <h2 className="mb-1 font-display text-lg font-semibold text-ink-900">Offers</h2>
       <p className="mb-4 text-sm text-ink-500">Publish a time-boxed discount — offers go live immediately.</p>
 

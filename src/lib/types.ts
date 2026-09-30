@@ -800,6 +800,8 @@ export interface SmartSearchResponse {
   needsLocation: boolean;
   /** business id → up to two short labels ("Menu: Chicken Biryani", "2.4 km from Mirpur"). */
   matchReasons: Record<string, string[]>;
+  /** V58: at most one paid result, shown above the organic results with a "Sponsored" label. */
+  sponsored?: SponsoredBusiness | null;
 }
 
 export type SearchSuggestionType = "CONCEPT" | "CONCEPT_AREA" | "CONCEPT_NEAR" | "AREA" | "BUSINESS" | "POPULAR";
@@ -1183,7 +1185,7 @@ export type CommunityPostType = "DISCUSSION" | "QUESTION" | "RECOMMENDATION" | "
  */
 export type CommunityTopic = string;
 /** Moderation state — everyone else only ever sees ACTIVE (and REMOVED placeholders); the author may also see PENDING/HIDDEN. */
-export type CommunityContentStatus = "ACTIVE" | "PENDING" | "HIDDEN" | "REMOVED";
+export type CommunityContentStatus = "ACTIVE" | "PENDING" | "HIDDEN" | "REMOVED" | "DRAFT";
 export type CommunityFeedTab = "FOR_YOU" | "FOLLOWING" | "NEARBY";
 export type CommunitySortOrder = "NEW" | "TOP";
 /** Derived server-side, not stored — see CommunityPostService#questionStatus. Only present when postType === "QUESTION". */
@@ -1278,6 +1280,283 @@ export interface CommunityPostResponse {
   official?: boolean;
   /** Only sent to the post's own author when status === "REMOVED". */
   removedReason?: string | null;
+  // ---- V58 business promotion (additive) ----
+  /** Set when posted AS a business — render the business identity; `author` is then a blank placeholder. */
+  business?: BusinessIdentity | null;
+  /** Promotion details for a business post (CTA, offer/menu refs, creative, expiry). */
+  promotion?: BusinessPostView | null;
+  /** Set only on a paid placement injected into a feed — always render a "Sponsored" label. */
+  sponsored?: SponsoredInfo | null;
+}
+
+// ---------------------------------------------------------------------------
+// Business promotion (V58)
+// ---------------------------------------------------------------------------
+export interface BusinessIdentity {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  verified: boolean;
+  areaName: string | null;
+}
+
+export type BusinessPostType = "MENU_ITEM" | "OFFER" | "EVENT" | "ANNOUNCEMENT" | "GENERAL";
+export type BusinessPostStatus = "DRAFT" | "PENDING_REVIEW" | "PUBLISHED" | "REJECTED" | "REMOVED" | "EXPIRED";
+export type BusinessPostCta = "GET_OFFER" | "ORDER" | "INTERESTED" | "VIEW_BUSINESS";
+
+export interface PromoOfferRef {
+  id: string;
+  title: string;
+  offerType: string | null;
+  discountValue: number | null;
+  originalPrice: number | null;
+  offerPrice: number | null;
+  validUntil: string;
+  active: boolean;
+}
+
+export interface PromoMenuItemRef {
+  id: string;
+  name: string;
+  price: number | null;
+  priceText: string | null;
+  photoUrl: string | null;
+  available: boolean;
+  orderable: boolean;
+}
+
+export interface BusinessPostView {
+  type: BusinessPostType;
+  status: BusinessPostStatus;
+  expired: boolean;
+  cta: BusinessPostCta;
+  offer: PromoOfferRef | null;
+  menuItem: PromoMenuItemRef | null;
+  eventStart: string | null;
+  eventEnd: string | null;
+  creativeId: string | null;
+  squareUrl: string | null;
+  storyUrl: string | null;
+  ogUrl: string | null;
+  interestedCount: number;
+  interested: boolean;
+  /** Owner only. */
+  rejectionReason: string | null;
+  /** Owner only, and only for a published post while boosts are enabled. */
+  canBoost: boolean;
+}
+
+export interface SponsoredInfo {
+  boostId: string;
+  /** "Why am I seeing this?" — targeting only (area / distance). */
+  why: string;
+}
+
+export interface SponsoredBusiness {
+  business: BusinessResponse;
+  boostId: string;
+  postId: string;
+  why: string;
+}
+
+export type CreativeFormat = "SQUARE" | "STORY" | "OG";
+export type PromoTemplateKey = "OFFER_BOLD" | "MENU_HIGHLIGHT" | "MINIMAL" | "EVENT_POSTER" | "RATING_SHOWCASE";
+
+/** Mirrors promo.PromoRenderModel — facts are always read from the DB by the server. */
+export interface PromoRenderModel {
+  templateKey: PromoTemplateKey;
+  businessName: string;
+  logoUrl: string | null;
+  areaName: string | null;
+  cityName: string | null;
+  averageRating: number | null;
+  reviewCount: number;
+  quote: { text: string; firstName: string; rating: number } | null;
+  headline: string | null;
+  subline: string | null;
+  accentColor: string;
+  photoUrl: string | null;
+  showRating: boolean;
+  showQr: boolean;
+  showPrice: boolean;
+  offer: { title: string; headlineText: string; originalPrice: number | null; offerPrice: number | null; validUntil: string; active: boolean } | null;
+  menuItem: { name: string; price: number | null; priceText: string | null; photoUrl: string | null } | null;
+  event: { title: string | null; start: string; end: string | null; location: string | null } | null;
+  shareUrl: string;
+  expired: boolean;
+}
+
+export interface CreativeData {
+  headline: string | null;
+  subline: string | null;
+  accentColor: string | null;
+  photoUrl: string | null;
+  offerId: string | null;
+  menuItemId: string | null;
+  eventTitle: string | null;
+  eventStart: string | null;
+  eventEnd: string | null;
+  showRating: boolean;
+  showQr: boolean;
+  showPrice: boolean;
+}
+
+export interface CreativeView {
+  id: string;
+  businessId: string;
+  templateKey: PromoTemplateKey;
+  data: CreativeData;
+  squareUrl: string | null;
+  storyUrl: string | null;
+  ogUrl: string | null;
+  createdAt: string;
+}
+
+export interface SavedCreative {
+  creative: CreativeView;
+  uploads: { format: CreativeFormat; objectKey: string; putUrl: string }[];
+}
+
+export interface PromoTemplateInfo {
+  key: PromoTemplateKey;
+  name: string;
+  supportedTypes: BusinessPostType[];
+  formats: CreativeFormat[];
+  configJson: string;
+}
+
+export interface StudioData {
+  businessId: string;
+  businessName: string;
+  slug: string;
+  logoUrl: string | null;
+  areaName: string | null;
+  cityName: string | null;
+  categoryKind: string | null;
+  averageRating: number | null;
+  reviewCount: number;
+  bestQuote: { text: string; firstName: string; rating: number } | null;
+  photos: string[];
+  offers: PromoOfferRef[];
+  menuItems: PromoMenuItemRef[];
+  templates: PromoTemplateInfo[];
+  swatches: string[];
+  logoColor: string | null;
+  postsRemainingThisWeek: number;
+  captionAiEnabled: boolean;
+  boostsEnabled: boolean;
+}
+
+export interface CaptionResult {
+  bn: string[];
+  en: string[];
+  source: "AI" | "TEMPLATE";
+  remainingToday: number;
+}
+
+export interface BusinessPostBody {
+  type: BusinessPostType;
+  title: string | null;
+  body: string;
+  creativeId: string | null;
+  offerId: string | null;
+  menuItemId: string | null;
+  eventStart: string | null;
+  eventEnd: string | null;
+  publish: boolean;
+}
+
+export type BoostStatus = "PENDING_PAYMENT" | "PENDING_REVIEW" | "ACTIVE" | "PAUSED" | "ENDED" | "REJECTED" | "REFUNDED";
+
+export interface BoostPackageInfo {
+  id: string;
+  name: string;
+  priceBdt: number;
+  estImpressions: number;
+  durationDays: number;
+  maxRadiusKm: number;
+  active: boolean;
+  sortOrder: number;
+}
+
+export interface PaymentOption {
+  method: "BKASH" | "NAGAD";
+  merchantNumber: string;
+}
+
+export interface BoostView {
+  id: string;
+  postId: string;
+  businessId: string;
+  businessName: string | null;
+  packageName: string;
+  status: BoostStatus;
+  targetAreaIds: string[];
+  targetAreaNames: string[];
+  radiusKm: number | null;
+  startAt: string;
+  endAt: string;
+  priceBdt: number;
+  paymentMethod: "BKASH" | "NAGAD" | "MANUAL" | null;
+  paymentRef: string | null;
+  paymentSubmittedAt: string | null;
+  paymentVerifiedAt: string | null;
+  paidAmount: number | null;
+  estImpressions: number;
+  impressionsServed: number;
+  rejectionReason: string | null;
+  refundReason: string | null;
+  createdAt: string;
+  payment: { amount: number; currency: string; options: PaymentOption[]; note: string } | null;
+}
+
+export type PromoEventType =
+  | "IMPRESSION" | "CLICK" | "PROFILE_VISIT" | "CALL" | "DIRECTIONS" | "MESSAGE" | "ORDER" | "BOOKING" | "OFFER_CLAIM" | "SHARE";
+export type PromoSource = "FEED" | "HOME" | "SEARCH" | "SHARE_LINK" | "EXTERNAL";
+
+export interface PromoDayPoint {
+  day: string;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+}
+
+export interface PromoAnalytics {
+  days: number;
+  headline: { postId: string; title: string; views: number; clicks: number; conversions: number; conversionEvent: string } | null;
+  totals: Record<PromoEventType, number>;
+  daily: PromoDayPoint[];
+  items: {
+    postId: string;
+    title: string;
+    type: BusinessPostType;
+    status: BusinessPostStatus;
+    createdAt: string;
+    totals: Record<PromoEventType, number>;
+    daily: PromoDayPoint[];
+    boosts: {
+      boostId: string;
+      status: BoostStatus;
+      packageName: string;
+      priceBdt: number;
+      paidAmount: number | null;
+      estImpressions: number;
+      impressionsServed: number;
+      startAt: string;
+      endAt: string;
+      costPerAction: number | null;
+      actions: number;
+    }[];
+  }[];
+  postsRemainingThisWeek: number;
+}
+
+export interface PromoSharePayload {
+  post: CommunityPostResponse;
+  business: BusinessResponse;
+  creative: PromoRenderModel | null;
+  shareUrl: string;
 }
 
 export interface CommunityCommentResponse {
@@ -1297,6 +1576,8 @@ export interface CommunityCommentResponse {
   status?: CommunityContentStatus;
   /** Only sent to the comment's own author when status === "REMOVED". */
   removedReason?: string | null;
+  /** V58: the business replied as itself (only on its own posts). */
+  business?: BusinessIdentity | null;
 }
 
 export interface CommunityTopicInfo {

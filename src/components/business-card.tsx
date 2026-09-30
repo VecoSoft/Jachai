@@ -78,13 +78,13 @@ function RatingLine({ business }: { business: BusinessCardData }) {
     return <p className="truncate text-[13px] text-ink-500">{t("business_card.new_no_reviews")}</p>;
   }
   return (
-    <p className="flex items-center gap-1.5 text-[13px]">
+    <div className="flex items-center gap-1.5 text-[13px]">
       <RatingBoxes rating={business.averageRating} size="sm" />
       <span className="font-semibold text-ink-900 dark:text-ink-100">{business.averageRating.toFixed(1)}</span>
       <span className="tabular-nums text-ink-500">
         ({tn("business_card.review_count", business.reviewCount, { n: formatReviewCount(business.reviewCount) })})
       </span>
-    </p>
+    </div>
   );
 }
 
@@ -224,7 +224,7 @@ function RatingLineWithMeta({ business }: { business: BusinessCardData }) {
     );
   }
   return (
-    <p className="flex items-center gap-1.5 truncate text-[13px]">
+    <div className="flex items-center gap-1.5 truncate text-[13px]">
       <RatingBoxes rating={business.averageRating} size="md" />
       <span className="font-semibold text-ink-900 dark:text-ink-100">{business.averageRating.toFixed(1)}</span>
       <span className="tabular-nums text-ink-500">
@@ -233,7 +233,7 @@ function RatingLineWithMeta({ business }: { business: BusinessCardData }) {
       <span className="text-ink-500">
         · {business.categoryName} · {priceLabel}
       </span>
-    </p>
+    </div>
   );
 }
 

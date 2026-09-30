@@ -22,6 +22,7 @@ import { PostHeader } from "./community-post-header";
 import { PostActions } from "./community-post-actions";
 import { PostMenu } from "./community-post-menu";
 import { Badge } from "./ui/misc";
+import { BusinessPostCard } from "./promo/business-post-card";
 
 /**
  * Reddit-inspired feed post — the container piece (CommunityPost) that
@@ -30,6 +31,23 @@ import { Badge } from "./ui/misc";
  * and passes onChanged/onDeleted to splice this post's slot.
  */
 export function CommunityPostCard({
+  post,
+  onChanged,
+  onDeleted,
+}: {
+  post: CommunityPostResponse;
+  onChanged: (post: CommunityPostResponse) => void;
+  onDeleted: (postId: string) => void;
+}) {
+  // V58: posts published as a business (and paid "Sponsored" placements) have their own card —
+  // business identity, "Business"/"Sponsored" label, creative and CTA.
+  if (post.business) {
+    return <BusinessPostCard post={post} onChanged={onChanged} onDeleted={onDeleted} />;
+  }
+  return <MemberPostCard post={post} onChanged={onChanged} onDeleted={onDeleted} />;
+}
+
+function MemberPostCard({
   post,
   onChanged,
   onDeleted,

@@ -10,6 +10,7 @@ import { useCommunityUsernameModal } from "@/lib/community-username-modal-contex
 import { applyVoteDelta } from "@/lib/community-vote";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { avatarColorClass, avatarInitials, cn, focusRing, interactiveTransition, timeAgo } from "@/lib/utils";
+import { BusinessAvatar, BusinessPill } from "./promo/business-post-card";
 import type { CommunityCommentResponse, CommunityPostVoteType } from "@/lib/types";
 import { Badge } from "./ui/misc";
 import { VoteControls } from "./vote-controls";
@@ -209,7 +210,10 @@ function CommentNode({
         </Badge>
       )}
       <div className="flex items-start gap-2">
-        {comment.author.communityAvatarUrl ? (
+        {comment.business ? (
+          // V58: a business replying as itself (only ever on its own post).
+          <BusinessAvatar name={comment.business.name} logoUrl={comment.business.logoUrl} size={28} />
+        ) : comment.author.communityAvatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={comment.author.communityAvatarUrl}
@@ -229,7 +233,14 @@ function CommentNode({
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold text-ink-800">
-              {comment.author.communityUsername ? (
+              {comment.business ? (
+                <span className="inline-flex items-center gap-1 py-2">
+                  <Link href={`/business/${comment.business.slug}`} className={cn("hover:underline", focusRing)}>
+                    {comment.business.name}
+                  </Link>
+                  <BusinessPill />
+                </span>
+              ) : comment.author.communityUsername ? (
                 <Link
                   href={`/community/u/${comment.author.communityUsername}`}
                   className={cn("inline-block py-2 hover:underline", focusRing)}
