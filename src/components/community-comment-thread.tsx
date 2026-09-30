@@ -23,6 +23,8 @@ interface ThreadProps {
   /** The post author's communityProfileId — marks their comments with an "OP" badge. */
   postAuthorId: string;
   /** Top-level items are "Answers" (with Best Answer marking) instead of plain "Comments". */
+  /** False when the post is locked/removed or the viewer is restricted — hides Reply. */
+  canReply?: boolean;
   isQuestion?: boolean;
   onCommentAdded: (comment: CommunityCommentResponse) => void;
   onCommentChanged: (comment: CommunityCommentResponse) => void;
@@ -39,6 +41,7 @@ export function CommunityCommentThread({
   isPostAuthor,
   postAuthorId,
   isQuestion = false,
+  canReply = true,
   onCommentAdded,
   onCommentChanged,
   onCommentDeleted,
@@ -66,6 +69,7 @@ export function CommunityCommentThread({
           isPostAuthor={isPostAuthor}
           postAuthorId={postAuthorId}
           isQuestion={isQuestion}
+          canReply={canReply}
           onCommentAdded={onCommentAdded}
           onCommentChanged={onCommentChanged}
           onCommentDeleted={onCommentDeleted}
@@ -84,6 +88,7 @@ interface CommentNodeProps {
   isPostAuthor: boolean;
   postAuthorId: string;
   isQuestion: boolean;
+  canReply: boolean;
   onCommentAdded: (comment: CommunityCommentResponse) => void;
   onCommentChanged: (comment: CommunityCommentResponse) => void;
   onCommentDeleted: (commentId: string) => void;
@@ -98,6 +103,7 @@ function CommentNode({
   isPostAuthor,
   postAuthorId,
   isQuestion,
+  canReply,
   onCommentAdded,
   onCommentChanged,
   onCommentDeleted,
@@ -121,6 +127,10 @@ function CommentNode({
   const displayName = comment.author.communityUsername ? `u/${comment.author.communityUsername}` : "[deleted]";
   const isAnswer = isQuestion && comment.depth === 0;
   const isOP = comment.author.id === postAuthorId;
+  // Moderation: a removed comment keeps its place as a placeholder; a held one is only visible to its author.
+  const isRemoved = comment.status === "REMOVED";
+  const isHeld = comment.status === "PENDING" || comment.status === "HIDDEN";
+  const interactive = canReply && !isRemoved && !isHeld;
 
   async function handleVote(type: CommunityPostVoteType) {
     await communityApi.voteComment(postId, comment.id, type);
@@ -256,17 +266,31 @@ function CommentNode({
               </button>
             )}
           </div>
-          <p className="mt-0.5 whitespace-pre-wrap text-sm text-ink-700">{comment.content}</p>
+          {isRemoved ? (
+            <p className="mt-0.5 text-sm italic text-ink-400">
+              {comment.content}
+              {comment.removedReason && (
+                <span className="mt-0.5 block text-xs not-italic text-ink-500">Reason: {comment.removedReason}</span>
+              )}
+            </p>
+          ) : (
+            <p className="mt-0.5 whitespace-pre-wrap text-sm text-ink-700">{comment.content}</p>
+          )}
+          {isHeld && (
+            <p className="mt-1 text-[11px] font-medium text-gold-700">Waiting for review — only you can see this.</p>
+          )}
 
           <div className="mt-1.5 flex flex-wrap items-center gap-3">
-            <VoteControls
-              score={comment.score}
-              myVote={comment.myVote}
-              onVote={handleVote}
-              size="sm"
-              orientation="horizontal"
-            />
-            {comment.depth < MAX_REPLY_DEPTH && (
+            {!isRemoved && !isHeld && (
+              <VoteControls
+                score={comment.score}
+                myVote={comment.myVote}
+                onVote={handleVote}
+                size="sm"
+                orientation="horizontal"
+              />
+            )}
+            {interactive && comment.depth < MAX_REPLY_DEPTH && (
               <button
                 type="button"
                 onClick={startReply}
@@ -279,7 +303,7 @@ function CommentNode({
                 Reply
               </button>
             )}
-            {isAnswer && isPostAuthor && (
+            {isAnswer && isPostAuthor && !isRemoved && !isHeld && (
               <button
                 type="button"
                 onClick={handleToggleBestAnswer}
@@ -334,6 +358,7 @@ function CommentNode({
               isPostAuthor={isPostAuthor}
               postAuthorId={postAuthorId}
               isQuestion={isQuestion}
+              canReply={canReply}
               onCommentAdded={onCommentAdded}
               onCommentChanged={onCommentChanged}
               onCommentDeleted={onCommentDeleted}

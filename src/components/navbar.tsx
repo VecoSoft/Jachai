@@ -102,14 +102,6 @@ export function Navbar() {
   const isHero = pathname === "/";
   const { params, setParams, locationStatus, useMyLocation } = useHomeSearch();
   const [scrolled, setScrolled] = useState(!isHero);
-  // Local, uncontrolled-feeling query text — only pushed into the shared
-  // `params` (and so the live search) on submit, not per keystroke, to avoid
-  // firing a request on every character typed. Re-synced whenever `params.q`
-  // changes from elsewhere (e.g. the hero's CategoryQuickNav tabs).
-  const [query, setQuery] = useState(params.q ?? "");
-  useEffect(() => {
-    setQuery(params.q ?? "");
-  }, [params.q]);
   const inboxUnreadCount = useBusinessInboxUnreadCount();
 
   // Consumer and Business are two separate accounts (see lib/auth-context.tsx's
@@ -179,10 +171,11 @@ export function Navbar() {
             Rating moved to a refine row by the results grid. */}
         {isHero && (
           <div className="hidden lg:flex items-center min-w-0 mx-2 flex-1">
+            {/* The box keeps its own draft text and only commits on submit — typing
+                fetches debounced suggestions, never a full search per keystroke. */}
             <PrimarySearchBar
-              query={query}
-              onQueryChange={setQuery}
-              onSearch={() => setParams({ ...params, q: query, page: 0 })}
+              query={params.q ?? ""}
+              onSearch={(q) => setParams({ ...params, q, page: 0 })}
               onUseMyLocation={useMyLocation}
               locationStatus={locationStatus}
               light={transparent}

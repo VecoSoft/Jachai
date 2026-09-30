@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { BadgeCheck, MapPin } from "lucide-react";
+import { BadgeCheck, Check, MapPin } from "lucide-react";
 import { priceTierLabel } from "@/lib/config";
 import { categoryIcon } from "@/lib/category-icons";
 import { getOpenStatus, type OpenStatus } from "@/lib/business-hours";
@@ -170,7 +170,26 @@ function VerifiedMark() {
   );
 }
 
-function CardMeta({ business, distance }: { business: BusinessCardData; distance: string | null }) {
+/** Search results only: why this card matched ("Menu: Chicken Biryani · 4.1 km from Mirpur"). */
+export function MatchReasons({ reasons, className }: { reasons?: string[]; className?: string }) {
+  if (!reasons || reasons.length === 0) return null;
+  return (
+    <p className={cn("flex items-center gap-1 truncate text-xs font-medium text-emerald-700 dark:text-emerald-400", className)}>
+      <Check aria-hidden size={13} strokeWidth={2.5} className="shrink-0" />
+      <span className="truncate">{reasons.join(" · ")}</span>
+    </p>
+  );
+}
+
+function CardMeta({
+  business,
+  distance,
+  matchReasons,
+}: {
+  business: BusinessCardData;
+  distance: string | null;
+  matchReasons?: string[];
+}) {
   const { lang } = useLanguage();
   return (
     <>
@@ -186,6 +205,7 @@ function CardMeta({ business, distance }: { business: BusinessCardData; distance
       <p className="truncate text-[13px] text-ink-500">
         {business.areaName}, {business.cityName}
       </p>
+      <MatchReasons reasons={matchReasons} />
       {business.activeOffer && <p className="truncate text-xs font-medium text-crimson-600">{business.activeOffer.title}</p>}
     </>
   );
@@ -236,10 +256,13 @@ export function BusinessCard({
   business,
   variant = "grid",
   className,
+  matchReasons,
 }: {
   business: BusinessCardData;
   variant?: Variant;
   className?: string;
+  /** Smart-search results only — short "why this matched" labels from the API. */
+  matchReasons?: string[];
 }) {
   const { t } = useLanguage();
   const { status: locationStatus, coords } = useUserLocation();
@@ -281,6 +304,7 @@ export function BusinessCard({
           </div>
           <RatingLineWithMeta business={business} />
           <StatusAreaLine business={business} distance={distance} />
+          <MatchReasons reasons={matchReasons} />
           {business.topReviewSnippet && (
             <p className="line-clamp-1 text-xs italic text-ink-500">&ldquo;{business.topReviewSnippet}&rdquo;</p>
           )}
@@ -299,7 +323,7 @@ export function BusinessCard({
         <BookmarkButton businessId={business.id} businessName={business.name} iconOnly />
       </div>
       <div className="flex flex-1 flex-col gap-1 p-3">
-        <CardMeta business={business} distance={distance} />
+        <CardMeta business={business} distance={distance} matchReasons={matchReasons} />
       </div>
     </Link>
   );

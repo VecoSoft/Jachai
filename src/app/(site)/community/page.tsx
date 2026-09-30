@@ -7,7 +7,8 @@ import { useAuth } from "@/lib/auth-context";
 import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { cn } from "@/lib/utils";
-import { COMMUNITY_FEED_TYPE_FILTERS, COMMUNITY_SORT_OPTIONS, COMMUNITY_TOPICS } from "@/lib/community-constants";
+import { COMMUNITY_FEED_TYPE_FILTERS, COMMUNITY_SORT_OPTIONS } from "@/lib/community-constants";
+import { selectableTopics, useCommunitySettings } from "@/lib/community-settings";
 import type { CommunityPostResponse, CommunityPostType, CommunitySortOrder, CommunityTopic } from "@/lib/types";
 import { CommunityComposer } from "@/components/community-composer";
 import { CommunityPostCard } from "@/components/community-post-card";
@@ -51,6 +52,7 @@ function CommunityPageInner() {
   const [topic, setTopic] = useState<CommunityTopic | null>(() => (searchParams.get("topic") as CommunityTopic | null) ?? null);
   const [sort, setSort] = useState<CommunitySortOrder>("NEW");
   const promptedForUsername = useRef(false);
+  const settings = useCommunitySettings();
 
   // "When a user first enters Community, if they do not yet have a Community
   // username" — show the setup modal proactively, not just when they try to post/comment.
@@ -136,7 +138,7 @@ function CommunityPageInner() {
           className="rounded-lg border border-ink-200 bg-surface px-2.5 py-1 text-xs font-medium text-ink-700 focus:outline-none focus:ring-2 focus:ring-crimson-500/30"
         >
           <option value="">All categories</option>
-          {COMMUNITY_TOPICS.map((t) => (
+          {selectableTopics(settings).map((t) => (
             <option key={t.value} value={t.value}>
               {t.label}
             </option>

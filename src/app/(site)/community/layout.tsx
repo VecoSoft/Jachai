@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { CommunityMobileNav } from "@/components/community-mobile-nav";
+import { CommunityStatusBanner } from "@/components/community-moderation";
 import { CommunitySidebar } from "@/components/community-sidebar";
 import { CommunityTrendingWidget } from "@/components/community-trending-widget";
 import { QuestionsForYouWidget } from "@/components/questions-for-you-widget";
@@ -38,6 +39,10 @@ export default function CommunityLayout({ children }: { children: React.ReactNod
           <Suspense fallback={null}>
             <CommunityMobileNav />
           </Suspense>
+        </div>
+        {/* Admin-controlled: maintenance / read-only notice + the "Jachai Team" announcement banner. */}
+        <div className="mb-3 empty:hidden lg:mt-6 lg:mb-0">
+          <CommunityStatusBanner />
         </div>
         {children}
       </div>

@@ -21,6 +21,9 @@ import type {
   BusinessReactionType,
   BusinessResponse,
   BusinessSearchParams,
+  SearchSuggestion,
+  SmartSearchParams,
+  SmartSearchResponse,
   AnalyticsRange,
   AnalyticsResponse,
   BusinessUpdate,
@@ -41,7 +44,9 @@ import type {
   CommunityPostType,
   CommunityPostVoteType,
   CommunityProfileResponse,
+  CommunityPublicSettings,
   CommunityQuestionRecommendation,
+  CommunityStanding,
   CommunitySortOrder,
   CommunityTopic,
   CompletenessResponse,
@@ -329,6 +334,20 @@ export const businessApi = {
       query: { ...params },
     }),
 
+  /** Intent-aware search behind the search box (Bangla/Banglish/English, typos, fallbacks). */
+  smartSearch: (params: SmartSearchParams) =>
+    request<SmartSearchResponse>("/api/v1/businesses/smart-search", {
+      auth: false,
+      query: { ...params },
+    }),
+
+  /** Dropdown rows for the search box — cheap, cacheable; call debounced. */
+  searchSuggestions: (q: string, lang: "en" | "bn") =>
+    request<SearchSuggestion[]>("/api/v1/businesses/search-suggestions", {
+      auth: false,
+      query: { q, lang },
+    }),
+
   getBySlug: (slug: string) =>
     request<BusinessResponse>(`/api/v1/businesses/${encodeURIComponent(slug)}`, { auth: false }),
 
@@ -459,6 +478,12 @@ export interface CommunityFeedParams {
 }
 
 export const communityApi = {
+  /** Admin-managed community configuration (topics, post types, limits, rules, maintenance, feature flags). Public. */
+  settings: () => request<CommunityPublicSettings>("/api/v1/community/settings", { auth: false }),
+
+  /** The caller's own standing — active mute/suspend/ban and recent warnings. Empty for guests. */
+  standing: () => request<CommunityStanding>("/api/v1/community/me/standing"),
+
   create: (body: CreateCommunityPostBody) =>
     request<CommunityPostResponse>("/api/v1/community/posts", { method: "POST", body }),
 

@@ -11,19 +11,23 @@ import {
   COMMUNITY_POLL_DURATIONS,
   COMMUNITY_POLL_MAX_OPTIONS,
   COMMUNITY_POLL_MIN_OPTIONS,
-  COMMUNITY_TOPICS,
+
 } from "@/lib/community-constants";
 import { errorMessage, useToast } from "@/lib/toast-context";
+import { communityWriteBlock, postTypeEnabled, selectableTopics, useCommunitySettings, useCommunityStanding } from "@/lib/community-settings";
+import { ApiClientError } from "@/lib/api";
 import { avatarColorClass, avatarInitials, cn } from "@/lib/utils";
 import type { CommunityMentionedBusinessSummary, CommunityPostResponse, CommunityPostType, CommunityTopic } from "@/lib/types";
 import { CommunityMarkdownToolbar } from "./community-markdown-toolbar";
+import { CommunityRestrictionNotice, CommunityRules } from "./community-moderation";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/modal";
 
-const BODY_MAX = 5000;
+// Fallbacks until GET /api/v1/community/settings loads — the admin-managed values replace them.
+const DEFAULT_BODY_MAX = 5000;
 const DEFAULT_POLL_DURATION_HOURS = 72;
-const MAX_PHOTO_MB = 5;
-const MAX_POST_PHOTOS = 10;
+const DEFAULT_MAX_PHOTO_MB = 5;
+const DEFAULT_MAX_POST_PHOTOS = 10;
 const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 /**
@@ -46,7 +50,7 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
   const [expanded, setExpanded] = useState(false);
   const [body, setBody] = useState("");
   const [postType, setPostType] = useState<Exclude<CommunityPostType, "POLL">>("DISCUSSION");
-  const [topic, setTopic] = useState<CommunityTopic>("GENERAL");
+  const [topic, setTopic] = useState<CommunityTopic>(() => "GENERAL");
   const [businessQuery, setBusinessQuery] = useState("");
   const [businessResults, setBusinessResults] = useState<CommunityMentionedBusinessSummary[]>([]);
   const [businessBoxOpen, setBusinessBoxOpen] = useState(false);
@@ -59,6 +63,27 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
   const [submitting, setSubmitting] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // Admin-managed rules (server-enforced; mirrored here for UX).
+  const settings = useCommunitySettings();
+  const { standing, refresh: refreshStanding } = useCommunityStanding();
+  const BODY_MAX = settings?.limits.postBodyMax ?? DEFAULT_BODY_MAX;
+  const MAX_PHOTO_MB = settings?.maxImageSizeMb ?? DEFAULT_MAX_PHOTO_MB;
+  const MAX_POST_PHOTOS = settings?.imagesEnabled === false ? 0 : (settings?.maxImagesPerPost ?? DEFAULT_MAX_POST_PHOTOS);
+  const topics = selectableTopics(settings);
+  const composerTypes = COMMUNITY_COMPOSER_TYPES.filter((t) => postTypeEnabled(settings, t.value));
+  const pollsEnabled = postTypeEnabled(settings, "POLL");
+  const writeBlock = communityWriteBlock(settings);
+  const defaultTopic = settings?.defaultTopic ?? "GENERAL";
+
+  // Keep the selections valid once the admin configuration arrives (or changes).
+  useEffect(() => {
+    if (!settings) return;
+    if (!topics.some((t) => t.value === topic)) setTopic(defaultTopic);
+    if (!composerTypes.some((t) => t.value === postType) && composerTypes.length > 0) setPostType(composerTypes[0].value);
+    if (!pollsEnabled && pollActive) setPollActive(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
 
   useEffect(() => {
     if (!businessQuery.trim()) {
@@ -76,8 +101,8 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
 
   function reset() {
     setBody("");
-    setPostType("DISCUSSION");
-    setTopic("GENERAL");
+    setPostType(composerTypes.some((t) => t.value === "DISCUSSION") ? "DISCUSSION" : (composerTypes[0]?.value ?? "DISCUSSION"));
+    setTopic(defaultTopic);
     setSelectedBusiness(null);
     setBusinessQuery("");
     setBusinessBoxOpen(false);
@@ -182,8 +207,9 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
       });
       onPosted(post);
       reset();
-      show("Posted", "success");
+      show(post.status === "PENDING" ? "Posted — it's waiting for review before others can see it" : "Posted", "success");
     } catch (err) {
+      if (err instanceof ApiClientError && err.status === 403) refreshStanding();
       show(errorMessage(err), "error");
     } finally {
       setSubmitting(false);
@@ -199,6 +225,16 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
         </Button>
       </div>
     );
+  }
+
+  // Maintenance / read-only mode, or this member is muted/suspended/banned: no composer.
+  if (writeBlock) {
+    return (
+      <div className="rounded-2xl border border-ink-100 bg-surface p-4 text-center text-sm text-ink-500 shadow-card">{writeBlock}</div>
+    );
+  }
+  if (standing?.restricted) {
+    return <CommunityRestrictionNotice standing={standing} />;
   }
 
   return (
@@ -273,7 +309,7 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
           </div>
 
           <div className="mt-4 flex gap-1 rounded-full bg-ink-50 p-1">
-            {COMMUNITY_COMPOSER_TYPES.map((t) => (
+            {composerTypes.map((t) => (
               <button
                 key={t.value}
                 type="button"
@@ -411,7 +447,7 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
               onChange={(e) => setTopic(e.target.value as CommunityTopic)}
               className="rounded-lg border border-ink-200 bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors duration-150 hover:border-ink-300 focus:outline-none focus:ring-2 focus:ring-crimson-500/30"
             >
-              {COMMUNITY_TOPICS.map((t) => (
+              {topics.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
                 </option>
@@ -430,7 +466,7 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
               </button>
             )}
 
-            {pollActive ? (
+            {!pollsEnabled ? null : pollActive ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-crimson-50 px-2.5 py-1 text-xs font-medium text-crimson-700">
                 <BarChart3 size={13} className="shrink-0" /> Poll
                 <button type="button" onClick={() => setPollActive(false)} aria-label="Remove poll" className="text-crimson-500 transition-colors duration-150 hover:text-crimson-700">
@@ -504,6 +540,8 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
               </div>
             )}
           </div>
+
+          <CommunityRules variant="composer" />
 
           <div className="mt-4 flex justify-end border-t border-ink-100 pt-3">
             <Button

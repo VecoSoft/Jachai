@@ -8,10 +8,12 @@ import { communityApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { cn } from "@/lib/utils";
-import { COMMUNITY_POST_TYPE_META, COMMUNITY_TOPIC_LABELS } from "@/lib/community-constants";
+import { COMMUNITY_POST_TYPE_META } from "@/lib/community-constants";
+import { topicLabel, useCommunitySettings } from "@/lib/community-settings";
 import { applyVoteDelta } from "@/lib/community-vote";
 import type { CommunityPollResponse, CommunityPostResponse, CommunityPostVoteType } from "@/lib/types";
 import { CommunityMarkdown } from "./community-markdown";
+import { PendingReviewNote, PostModerationLabels, RemovedPostPlaceholder } from "./community-moderation";
 import { CommunityPostPhotoGrid } from "./community-post-photo-grid";
 import { CommunityPoll } from "./community-poll";
 import { QuestionStatusBadge } from "./community-question-status-badge";
@@ -41,6 +43,7 @@ export function CommunityPostCard({
   const { show } = useToast();
   const [deleting, setDeleting] = useState(false);
 
+  const settings = useCommunitySettings();
   const isAuthor = profile?.communityProfileId === post.author.id;
   const typeMeta = COMMUNITY_POST_TYPE_META[post.postType];
   const business = post.mentionedBusinesses[0] ?? null;
@@ -105,6 +108,7 @@ export function CommunityPostCard({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <PostModerationLabels post={post} />
         {post.postType !== "DISCUSSION" && (
           <Badge tone={post.postType === "RECOMMENDATION" ? "gold" : "neutral"} className="uppercase tracking-wide">
             <typeMeta.icon size={11} className="shrink-0" /> {typeMeta.label}
@@ -112,9 +116,12 @@ export function CommunityPostCard({
         )}
         {post.questionStatus && <QuestionStatusBadge status={post.questionStatus} />}
         <Badge tone="crimson" className="border-crimson-100 bg-crimson-50/70 font-medium">
-          {COMMUNITY_TOPIC_LABELS[post.topic]}
+          {topicLabel(settings, post.topic)}
         </Badge>
       </div>
+
+      {post.status === "REMOVED" && <RemovedPostPlaceholder post={post} />}
+      {isAuthor && (post.status === "PENDING" || post.status === "HIDDEN") && <PendingReviewNote />}
 
       {post.title && (
         <h3 className="mt-2 font-display text-[15px] font-bold leading-snug text-ink-900">{post.title}</h3>
@@ -174,7 +181,7 @@ export function CommunityPostCard({
         </div>
         <PostMenu
           isAuthor={isAuthor}
-          canReport={Boolean(user) && !isAuthor}
+          canReport={Boolean(user) && !isAuthor && !post.official && post.status !== "REMOVED"}
           targetId={post.id}
           onDelete={handleDelete}
           deleting={deleting}

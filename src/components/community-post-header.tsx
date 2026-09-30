@@ -36,6 +36,30 @@ export function PostHeader({
   const nameSize = size === "md" ? "text-sm" : "text-[13px]";
   const isSelf = profile?.communityProfileId === author.id;
 
+  // Official "Jachai Team" announcements: brand identity + badge, no profile link, no follow.
+  if (author.official) {
+    return (
+      <div className="flex min-w-0 items-start gap-2.5">
+        <div className={cn("flex shrink-0 items-center justify-center rounded-full bg-crimson-600 font-bold text-white", avatarSize)}>
+          J
+        </div>
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className={cn("flex items-center gap-1 font-semibold text-ink-800 dark:text-ink-100", nameSize)}>
+            {author.communityUsername ?? "Jachai Team"}
+            <BadgeCheck size={size === "md" ? 15 : 13} className="shrink-0 text-brand-600" aria-label="Official account" />
+            <span className="rounded-full bg-brand-50 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-brand-700">
+              Official
+            </span>
+          </p>
+          <p className="text-xs text-ink-500">
+            {timeAgo(createdAt)}
+            {area && ` · ${area.name}`}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-w-0 items-start gap-2.5">
       {author.communityAvatarUrl ? (

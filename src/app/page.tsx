@@ -5,8 +5,9 @@ import { businessApi } from "@/lib/api";
 import { rememberBusinesses } from "@/lib/business-cache";
 import { useHomeSearch } from "@/lib/home-search-context";
 import { useUserLocation } from "@/lib/location-context";
+import { useLanguage } from "@/lib/language-context";
 import { errorMessage } from "@/lib/toast-context";
-import type { Area, BusinessResponse, Category } from "@/lib/types";
+import type { Area, BusinessResponse, Category, SearchSuggestion, SmartSearchResponse } from "@/lib/types";
 import { BrandCard } from "@/components/brand-card";
 import { BusinessCard } from "@/components/business-card";
 import { BusinessCarousel } from "@/components/business-carousel";
@@ -17,6 +18,8 @@ import { ExploreCities } from "@/components/explore-cities";
 import { LocationChip } from "@/components/location-chip";
 import { QuestionsForYouWidget } from "@/components/questions-for-you-widget";
 import { Reveal } from "@/components/reveal";
+import { SearchUnderstanding } from "@/components/search-understanding";
+import { SmartSearchBar } from "@/components/smart-search-bar";
 import { EmptyState, ErrorBanner, Pagination } from "@/components/ui/misc";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -60,9 +63,13 @@ export default function HomePage() {
     cityId,
     setCityId,
   } = useHomeSearch();
-  const { clear: clearLocation } = useUserLocation();
+  const { clear: clearLocation, status: sharedLocationStatus, coords } = useUserLocation();
+  const { t, lang } = useLanguage();
 
   const [results, setResults] = useState<BusinessResponse[]>([]);
+  // Set only for text searches (smart search); plain browsing/filtering keeps using /businesses/search.
+  const [smartMeta, setSmartMeta] = useState<Omit<SmartSearchResponse, "results"> | null>(null);
+  const [popular, setPopular] = useState<SearchSuggestion[]>([]);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -108,17 +115,42 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Text in the search box → smart search (intent, fallbacks, match reasons); otherwise the plain
+  // filter search. Location is only *used* if already granted — searching never prompts for it.
+  // Coords are rounded (~100 m) so GPS jitter doesn't trigger re-searches.
+  const query = params.q?.trim() ?? "";
+  const grantedLat = sharedLocationStatus === "granted" && coords ? Math.round(coords.lat * 1000) / 1000 : undefined;
+  const grantedLng = sharedLocationStatus === "granted" && coords ? Math.round(coords.lng * 1000) / 1000 : undefined;
+  const smartKey = query ? `${lang}|${grantedLat ?? ""}|${grantedLng ?? ""}` : "";
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    businessApi
-      .search(params)
-      .then((page) => {
+    const request = query
+      ? businessApi
+          .smartSearch({
+            q: query,
+            categoryId: params.categoryId,
+            areaId: params.areaId,
+            priceTier: params.priceTier,
+            minRating: params.minRating,
+            lat: params.lat ?? grantedLat,
+            lng: params.lng ?? grantedLng,
+            sort: params.sort,
+            page: params.page,
+            size: params.size,
+            lang,
+          })
+          .then(({ results: page, ...meta }) => ({ page, meta }))
+      : businessApi.search(params).then((page) => ({ page, meta: null }));
+    request
+      .then(({ page, meta }) => {
         if (cancelled) return;
         setResults(page.content);
         setTotalPages(page.totalPages);
         setTotalElements(page.totalElements);
+        setSmartMeta(meta);
         rememberBusinesses(page.content);
       })
       .catch((err) => !cancelled && setError(errorMessage(err)))
@@ -126,7 +158,26 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [params]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, smartKey]);
+
+  // A new text search should bring its results into view (the box lives in the navbar/hero, far above the grid).
+  const lastQueryRef = useRef(query);
+  useEffect(() => {
+    if (query && query !== lastQueryRef.current) scrollToResults();
+    lastQueryRef.current = query;
+  }, [query]);
+
+  // Ideas to offer when a text search finds nothing — fetched lazily, only in that case.
+  const noSmartResults = Boolean(query) && !loading && !error && results.length === 0;
+  useEffect(() => {
+    if (!noSmartResults) return;
+    businessApi.searchSuggestions("", lang).then(setPopular).catch(() => setPopular([]));
+  }, [noSmartResults, lang]);
+
+  function runSearch(q: string) {
+    setParams({ ...params, q, page: 0 });
+  }
 
   // Sitewide, unfiltered by the search params above — a fixed top-10 snapshot
   // fetched once on mount, not re-fetched as the visitor changes filters.
@@ -202,7 +253,17 @@ export default function HomePage() {
             popover — plus the category quick-nav strip, which stays lg+ only. */}
         <div className="relative z-20 mt-16 animate-hero-in">
           <div className="lg:hidden bg-scrim/90 backdrop-blur-md border-b border-white/10">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 space-y-1.5">
+              {/* Same search box as the navbar's (lg+ only) — mobile/tablet had
+                  dropdowns but no way to type a search at all. */}
+              <SmartSearchBar
+                value={params.q ?? ""}
+                onSubmit={runSearch}
+                placeholder={t("search.placeholder_short")}
+                formClassName="flex min-w-0 items-stretch overflow-hidden rounded-xl bg-white focus-within:ring-2 focus-within:ring-crimson-300"
+                inputClassName="py-2.5"
+                submitClassName="w-12"
+              />
               {/* Full self-contained mobile/tablet filter UI (bottom sheet /
                   popover) — unchanged. Below lg only; lg+ uses the Navbar's
                   inline search instead, so this whole div is lg:hidden above. */}
@@ -310,22 +371,56 @@ export default function HomePage() {
 
           {!loading && !error && (
             <>
+              {query && smartMeta && (
+                <SearchUnderstanding
+                  query={query}
+                  meta={smartMeta}
+                  locationStatus={locationStatus}
+                  onUseMyLocation={useMyLocation}
+                  onClear={() => runSearch("")}
+                  onSearch={runSearch}
+                />
+              )}
               <p key={totalElements} className="animate-fade-in text-sm font-medium text-ink-500 mb-4">
                 {totalElements} businesses found
               </p>
               {results.length === 0 ? (
-                <EmptyState
-                  title="No businesses match those filters"
-                  description="Try widening your area, dropping the minimum rating, or clearing a filter."
-                />
+                query ? (
+                  <EmptyState
+                    title={t("search.no_results_title", { q: query })}
+                    description={t("search.no_results_desc")}
+                    action={
+                      popular.length > 0 && (
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {popular.map((s) => (
+                            <button
+                              key={s.query}
+                              type="button"
+                              onClick={() => runSearch(s.query)}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-sm text-ink-700 transition-colors hover:border-crimson-300 hover:text-crimson-700"
+                            >
+                              {s.icon && <span aria-hidden>{s.icon}</span>}
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    }
+                  />
+                ) : (
+                  <EmptyState
+                    title="No businesses match those filters"
+                    description="Try widening your area, dropping the minimum rating, or clearing a filter."
+                  />
+                )
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                   {results.map((b, i) => (
                     <Reveal key={b.id} delay={Math.min(i, 8) * 60}>
                       {b.branchCount && b.branchCount > 1 ? (
-                        <BrandCard business={b} />
+                        <BrandCard business={b} matchReasons={smartMeta?.matchReasons[b.id]} />
                       ) : (
-                        <BusinessCard business={b} />
+                        <BusinessCard business={b} matchReasons={smartMeta?.matchReasons[b.id]} />
                       )}
                     </Reveal>
                   ))}

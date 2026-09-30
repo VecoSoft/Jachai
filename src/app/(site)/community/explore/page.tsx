@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { communityApi } from "@/lib/api";
 import { useHomeSearch } from "@/lib/home-search-context";
-import { COMMUNITY_TOPICS } from "@/lib/community-constants";
+import { selectableTopics, useCommunitySettings } from "@/lib/community-settings";
 import { cn } from "@/lib/utils";
 import type { CommunityPostResponse, CommunityPostType } from "@/lib/types";
 import { CommunityPostCard } from "@/components/community-post-card";
@@ -14,7 +14,7 @@ import { EmptyState, PageSpinner } from "@/components/ui/misc";
 /**
  * Discovery hub — reuses the existing feed (sort=TOP + postType filter) and
  * Nearby (tab=NEARBY + areaId) queries, no new backend or ranking logic.
- * Categories are the same fixed topic list the Home feed's Category
+ * Categories are the admin-managed topic list (GET /community/settings), same as the Home feed.s
  * dropdown already uses.
  */
 export default function CommunityExplorePage() {
@@ -41,6 +41,7 @@ export default function CommunityExplorePage() {
  *  behind a single toggle button instead, matching the compact icon-first nav above it. */
 function CategoriesMenu() {
   const [open, setOpen] = useState(false);
+  const settings = useCommunitySettings();
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,7 +82,7 @@ function CategoriesMenu() {
           className="absolute left-0 top-full z-20 mt-2 w-64 animate-scale-in rounded-xl border border-ink-100 bg-surface p-2.5 shadow-pop"
         >
           <div className="flex flex-wrap gap-1.5">
-            {COMMUNITY_TOPICS.map((t) => (
+            {selectableTopics(settings).map((t) => (
               <Link
                 key={t.value}
                 href={`/community?topic=${t.value}`}

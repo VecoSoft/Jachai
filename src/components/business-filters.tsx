@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { Area, BusinessSearchParams, Category, City, PriceTier, SortOption } from "@/lib/types";
 import { MobileFilters } from "./business-filters-mobile";
 import { TabletFilters } from "./business-filters-tablet";
+import { SmartSearchBar } from "./smart-search-bar";
 
 export interface DropdownOption<T> {
   value: T | undefined;
@@ -192,15 +193,6 @@ function PinIcon({ filled }: { filled: boolean }) {
   );
 }
 
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="11" cy="11" r="7" />
-      <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 // The Navbar's inline search (home page, lg+): a plain white rounded search
 // bar — free-text query + a static "current city" location field (this app
 // is Dhaka-only in practice, so the location field is a display, not a real
@@ -211,7 +203,6 @@ function SearchIcon({ className }: { className?: string }) {
 // since the Navbar can be transparent-over-photo (white) or solid (dark).
 export function PrimarySearchBar({
   query,
-  onQueryChange,
   onSearch,
   onUseMyLocation,
   locationStatus,
@@ -219,49 +210,33 @@ export function PrimarySearchBar({
   light,
   className,
 }: {
+  /** The committed search text (shared home-search state). */
   query: string;
-  onQueryChange: (value: string) => void;
-  onSearch: () => void;
+  /** Runs a search for `q` — Enter, the submit button, or a picked suggestion. */
+  onSearch: (q: string) => void;
   onUseMyLocation: () => void;
   locationStatus: "idle" | "locating" | "granted" | "denied";
   cityLabel?: string;
   light?: boolean;
   className?: string;
 }) {
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    onSearch();
-  }
-
   return (
     <div className={cn("flex min-w-0 flex-1 items-center gap-2 xl:gap-4", className)}>
-      <form
-        onSubmit={handleSubmit}
-        className="flex min-w-0 max-w-[480px] flex-1 items-stretch overflow-hidden rounded-md bg-white shadow-[0_2px_8px_rgba(0,0,0,0.18)]"
-      >
-        <div className="flex min-w-0 flex-1 items-center">
-          <SearchIcon className="ml-3 h-5 w-5 shrink-0 text-ink-400" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="restaurants, cafés, shops..."
-            className="w-full min-w-0 bg-transparent px-3 py-3 text-base text-ink-800 outline-none placeholder:text-ink-400"
-          />
-        </div>
-        <span className="my-2 w-px shrink-0 bg-ink-200" />
-        <div className="hidden w-[180px] shrink-0 items-center gap-1.5 px-3 text-ink-500 xl:flex">
-          <PinIcon filled={false} />
-          <span className="truncate text-base">{cityLabel}</span>
-        </div>
-        <button
-          type="submit"
-          className="grid w-14 shrink-0 place-items-center bg-crimson-500 text-white transition-colors hover:bg-crimson-600"
-          aria-label="Search"
-        >
-          <SearchIcon className="h-5 w-5" />
-        </button>
-      </form>
+      <SmartSearchBar
+        value={query}
+        onSubmit={onSearch}
+        className="max-w-[480px] flex-1"
+        formClassName="flex min-w-0 items-stretch overflow-hidden rounded-md bg-white shadow-[0_2px_8px_rgba(0,0,0,0.18)] focus-within:ring-2 focus-within:ring-crimson-300"
+        trailing={
+          <>
+            <span className="my-2 w-px shrink-0 bg-ink-200" />
+            <div className="hidden w-[180px] shrink-0 items-center gap-1.5 px-3 text-ink-500 xl:flex">
+              <PinIcon filled={false} />
+              <span className="truncate text-base">{cityLabel}</span>
+            </div>
+          </>
+        }
+      />
 
       <button
         type="button"

@@ -761,6 +761,59 @@ export interface BusinessSearchParams {
   size?: number;
 }
 
+/** GET /api/v1/businesses/smart-search — intent-aware search used whenever the search box has text. */
+export interface SmartSearchParams {
+  q: string;
+  categoryId?: string;
+  areaId?: string;
+  priceTier?: PriceTier;
+  minRating?: number;
+  /** Only ever sent when the visitor has already granted location — never requested by search itself. */
+  lat?: number;
+  lng?: number;
+  sort?: SortOption;
+  page?: number;
+  size?: number;
+  lang?: "en" | "bn";
+}
+
+export interface SmartSearchIntent {
+  what: { label: string; icon: string }[];
+  keywords: string[];
+  location: string | null;
+  /** false = the place was recognised but has no listings yet (results then come from all areas). */
+  locationKnown: boolean;
+  price: "LOW" | "HIGH" | null;
+  ratingHigh: boolean;
+  nearMe: boolean;
+  openNow: boolean;
+  /** Set when a typo was fixed — shown as "Showing results for …". */
+  correctedQuery: string | null;
+}
+
+export interface SmartSearchResponse {
+  results: PageResponse<BusinessResponse>;
+  intent: SmartSearchIntent;
+  /** Already localised; set when a constraint had to be relaxed to find anything. */
+  notice: string | null;
+  /** The query asked for "near me" but no location was sent. */
+  needsLocation: boolean;
+  /** business id → up to two short labels ("Menu: Chicken Biryani", "2.4 km from Mirpur"). */
+  matchReasons: Record<string, string[]>;
+}
+
+export type SearchSuggestionType = "CONCEPT" | "CONCEPT_AREA" | "CONCEPT_NEAR" | "AREA" | "BUSINESS" | "POPULAR";
+
+export interface SearchSuggestion {
+  type: SearchSuggestionType;
+  label: string;
+  /** Text to search when picked (BUSINESS rows navigate to `slug` instead). */
+  query: string;
+  icon: string | null;
+  slug: string | null;
+  detail: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Reviews
 // ---------------------------------------------------------------------------
@@ -1123,18 +1176,14 @@ export type BusinessCardData = Pick<
 // ---------------------------------------------------------------------------
 export type CommunityPostVoteType = "UPVOTE" | "DOWNVOTE";
 export type CommunityPostType = "DISCUSSION" | "QUESTION" | "RECOMMENDATION" | "POLL";
-export type CommunityTopic =
-  | "FOOD"
-  | "HEALTHCARE"
-  | "BEAUTY"
-  | "SHOPPING"
-  | "FITNESS"
-  | "LOCAL"
-  | "SERVICES"
-  | "JOBS"
-  | "EDUCATION"
-  | "TRAVEL"
-  | "GENERAL";
+/**
+ * A community_topic code. Topics are admin-managed (admin panel → Community → Settings) and come
+ * from GET /api/v1/community/settings, so this is an open string — the original built-in codes
+ * ("FOOD", "HEALTHCARE", …) are still what existing posts carry.
+ */
+export type CommunityTopic = string;
+/** Moderation state — everyone else only ever sees ACTIVE (and REMOVED placeholders); the author may also see PENDING/HIDDEN. */
+export type CommunityContentStatus = "ACTIVE" | "PENDING" | "HIDDEN" | "REMOVED";
 export type CommunityFeedTab = "FOR_YOU" | "FOLLOWING" | "NEARBY";
 export type CommunitySortOrder = "NEW" | "TOP";
 /** Derived server-side, not stored — see CommunityPostService#questionStatus. Only present when postType === "QUESTION". */
@@ -1159,6 +1208,8 @@ export interface CommunityAuthorSummary {
   verified: boolean;
   /** Separate, optional avatar for this pseudonymous identity — never the real account photo. Null falls back to initials. */
   communityAvatarUrl: string | null;
+  /** "Jachai Team" identity on official announcements — not a real community profile (don't link it). */
+  official?: boolean;
 }
 
 export interface CommunityMentionedBusinessSummary {
@@ -1217,6 +1268,16 @@ export interface CommunityPostResponse {
   answerCount: number;
   createdAt: string;
   updatedAt: string;
+  // ---- Moderation (additive; optional so older payloads still type-check) ----
+  status?: CommunityContentStatus;
+  /** Comments are turned off. */
+  locked?: boolean;
+  pinned?: boolean;
+  featured?: boolean;
+  /** "Jachai Team" announcement. */
+  official?: boolean;
+  /** Only sent to the post's own author when status === "REMOVED". */
+  removedReason?: string | null;
 }
 
 export interface CommunityCommentResponse {
@@ -1233,6 +1294,65 @@ export interface CommunityCommentResponse {
   myVote: CommunityPostVoteType | null;
   createdAt: string;
   updatedAt: string;
+  status?: CommunityContentStatus;
+  /** Only sent to the comment's own author when status === "REMOVED". */
+  removedReason?: string | null;
+}
+
+export interface CommunityTopicInfo {
+  code: string;
+  label: string;
+  labelBn: string | null;
+  /** lucide-react icon name. */
+  icon: string | null;
+  color: string | null;
+  position: number;
+  enabled: boolean;
+  defaultTopic: boolean;
+}
+
+/** GET /api/v1/community/settings — admin-managed, public subset (mirrors the server rules for UX). */
+export interface CommunityPublicSettings {
+  communityEnabled: boolean;
+  maintenanceMessage: string;
+  readOnly: boolean;
+  readOnlyMessage: string;
+  guestsCanRead: boolean;
+  topics: CommunityTopicInfo[];
+  defaultTopic: string;
+  postTypes: Record<CommunityPostType, boolean>;
+  imagesEnabled: boolean;
+  maxImagesPerPost: number;
+  maxImageSizeMb: number;
+  pollsEnabled: boolean;
+  limits: {
+    postBodyMin: number;
+    postBodyMax: number;
+    questionTitleMin: number;
+    questionTitleMax: number;
+    commentMin: number;
+    commentMax: number;
+    maxLinksPerPost: number;
+  };
+  allowedAreaIds: string[];
+  rulesMarkdown: string;
+  features: { nidVerificationEnabled: boolean };
+  banner: { id: string; postId: string; text: string; scope: string; areaId: string | null; topic: string | null } | null;
+}
+
+export interface CommunityStandingItem {
+  id: string;
+  type: "WARN" | "MUTE" | "SUSPEND" | "BAN";
+  reason: string;
+  startsAt: string;
+  endsAt: string | null;
+}
+
+/** GET /api/v1/community/me/standing — restricted = can't post/comment/vote right now. */
+export interface CommunityStanding {
+  restricted: boolean;
+  restriction: CommunityStandingItem | null;
+  items: CommunityStandingItem[];
 }
 
 export interface CommunityProfileResponse {

@@ -3,18 +3,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { BadgeCheck, Store } from "lucide-react";
-import { communityApi } from "@/lib/api";
+import { BadgeCheck, Lock, Store } from "lucide-react";
+import { ApiClientError, communityApi } from "@/lib/api";
+import { communityWriteBlock, topicLabel, useCommunitySettings, useCommunityStanding } from "@/lib/community-settings";
 import { useAuth } from "@/lib/auth-context";
 import { useAuthModal } from "@/lib/auth-modal-context";
 import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
 import { applyVoteDelta } from "@/lib/community-vote";
-import { COMMUNITY_POST_TYPE_META, COMMUNITY_TOPIC_LABELS } from "@/lib/community-constants";
+import { COMMUNITY_POST_TYPE_META } from "@/lib/community-constants";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { cn } from "@/lib/utils";
 import type { CommunityCommentResponse, CommunityPostResponse, CommunityPostVoteType } from "@/lib/types";
 import { CommunityCommentThread } from "@/components/community-comment-thread";
 import { CommunityMarkdown } from "@/components/community-markdown";
+import {
+  CommunityRestrictionNotice,
+  PendingReviewNote,
+  PostModerationLabels,
+  RemovedPostPlaceholder,
+} from "@/components/community-moderation";
 import { CommunityPostPhotoGrid } from "@/components/community-post-photo-grid";
 import { CommunityPoll } from "@/components/community-poll";
 import { PostActions } from "@/components/community-post-actions";
@@ -34,6 +41,8 @@ export default function CommunityPostDetailPage() {
   const { openLogin } = useAuthModal();
   const { openModal: openUsernameModal } = useCommunityUsernameModal();
   const { show } = useToast();
+  const settings = useCommunitySettings();
+  const { standing, refresh: refreshStanding } = useCommunityStanding();
 
   const [post, setPost] = useState<CommunityPostResponse | null>(null);
   const [comments, setComments] = useState<CommunityCommentResponse[]>([]);
@@ -103,8 +112,11 @@ export default function CommunityPostDetailPage() {
       const comment = await communityApi.addComment(post.id, commentText.trim());
       setComments((prev) => [...prev, comment]);
       setCommentText("");
-      setPost({ ...post, commentCount: post.commentCount + 1 });
+      // A comment held for review isn't counted (or shown to others) until it's approved.
+      if (comment.status !== "PENDING") setPost({ ...post, commentCount: post.commentCount + 1 });
+      else show("Your comment is waiting for review.", "success");
     } catch (err) {
+      if (err instanceof ApiClientError && err.status === 403) refreshStanding();
       show(errorMessage(err), "error");
     } finally {
       setPostingComment(false);
@@ -113,6 +125,10 @@ export default function CommunityPostDetailPage() {
 
   function handleCommentAdded(comment: CommunityCommentResponse) {
     setComments((prev) => [...prev, comment]);
+    if (comment.status === "PENDING") {
+      show("Your reply is waiting for review.", "success");
+      return;
+    }
     setPost((prev) => (prev ? { ...prev, commentCount: prev.commentCount + 1 } : prev));
   }
 
@@ -167,6 +183,8 @@ export default function CommunityPostDetailPage() {
   if (error || !post) return <ErrorBanner message={error ?? "Post not found"} />;
 
   const isAuthor = profile?.communityProfileId === post.author.id;
+  const isRemoved = post.status === "REMOVED";
+  const writeBlock = communityWriteBlock(settings);
   const isQuestion = post.postType === "QUESTION";
   const typeMeta = COMMUNITY_POST_TYPE_META[post.postType];
   const business = post.mentionedBusinesses[0] ?? null;
@@ -182,7 +200,7 @@ export default function CommunityPostDetailPage() {
           <PostHeader author={post.author} area={post.area} createdAt={post.createdAt} size="md" />
           <PostMenu
             isAuthor={isAuthor}
-            canReport={Boolean(user) && !isAuthor}
+            canReport={Boolean(user) && !isAuthor && !post.official && !isRemoved}
             targetId={post.id}
             onDelete={handleDelete}
             deleting={deleting}
@@ -192,15 +210,19 @@ export default function CommunityPostDetailPage() {
           />
         </div>
 
-        <div className="mt-3 flex items-center gap-1.5">
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <PostModerationLabels post={post} />
           {post.postType !== "DISCUSSION" && (
             <Badge tone={post.postType === "RECOMMENDATION" ? "gold" : "neutral"}>
               <typeMeta.icon size={11} className="shrink-0" /> {typeMeta.label}
             </Badge>
           )}
           {post.questionStatus && <QuestionStatusBadge status={post.questionStatus} />}
-          <Badge tone="crimson">{COMMUNITY_TOPIC_LABELS[post.topic]}</Badge>
+          <Badge tone="crimson">{topicLabel(settings, post.topic)}</Badge>
         </div>
+
+        {isRemoved && <RemovedPostPlaceholder post={post} />}
+        {isAuthor && (post.status === "PENDING" || post.status === "HIDDEN") && <PendingReviewNote />}
 
         {post.title && (
           <h1 className="mt-2 font-display text-xl font-bold leading-snug text-ink-900">{post.title}</h1>
@@ -231,7 +253,7 @@ export default function CommunityPostDetailPage() {
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink-100 pt-3">
-          <VoteControls score={post.score} myVote={post.myVote} onVote={handleVote} orientation="horizontal" />
+          {!isRemoved && <VoteControls score={post.score} myVote={post.myVote} onVote={handleVote} orientation="horizontal" />}
           <PostActions
             commentCount={isQuestion ? post.answerCount : post.commentCount}
             shareUrl={`/community/${post.id}`}
@@ -249,7 +271,19 @@ export default function CommunityPostDetailPage() {
             : `${post.commentCount} Comment${post.commentCount === 1 ? "" : "s"}`}
         </h2>
 
-        {isQuestion && post.questionStatus === "CLOSED" ? (
+        {isRemoved ? (
+          <p className="mt-2 text-sm text-ink-400">This post was removed by moderators — no new comments.</p>
+        ) : post.locked ? (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-ink-50 px-3 py-2 text-sm text-ink-600">
+            <Lock size={14} className="shrink-0" /> Comments are turned off
+          </p>
+        ) : post.status === "PENDING" || post.status === "HIDDEN" ? (
+          <p className="mt-2 text-sm text-ink-400">Comments open once a moderator approves this post.</p>
+        ) : writeBlock ? (
+          <p className="mt-2 text-sm text-ink-500">{writeBlock}</p>
+        ) : standing?.restricted ? (
+          <CommunityRestrictionNotice standing={standing} className="mt-2" />
+        ) : isQuestion && post.questionStatus === "CLOSED" ? (
           <p className="mt-2 text-sm text-ink-400">This question is closed to new answers.</p>
         ) : user ? (
           <div className="mt-2 flex items-start gap-2">
@@ -281,6 +315,7 @@ export default function CommunityPostDetailPage() {
             isPostAuthor={isAuthor}
             postAuthorId={post.author.id}
             isQuestion={isQuestion}
+            canReply={!isRemoved && !post.locked && !writeBlock && !standing?.restricted && post.status !== "PENDING" && post.status !== "HIDDEN"}
             onCommentAdded={handleCommentAdded}
             onCommentChanged={handleCommentChanged}
             onCommentDeleted={handleCommentDeleted}

@@ -8,6 +8,7 @@ import { useAuthModal } from "@/lib/auth-modal-context";
 import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
 import { cn, focusRing, interactiveTransition } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
+import { CommunityRules } from "./community-moderation";
 
 interface NavItem {
   href: string;
@@ -126,6 +127,7 @@ export function CommunitySidebar({ className }: { className?: string }) {
         <p className="px-3 text-xs font-semibold uppercase tracking-wide text-ink-400">Social</p>
         <div className="mt-1.5">{renderGroup(SOCIAL_ITEMS)}</div>
       </div>
+      <CommunityRules variant="sidebar" />
     </nav>
   );
 }

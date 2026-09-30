@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import type { BusinessResponse } from "@/lib/types";
 import { formatReviewCount } from "@/lib/utils";
+import { MatchReasons } from "./business-card";
 import { RatingBoxes } from "./rating-boxes";
 import { Card } from "./ui/misc";
 
@@ -16,7 +17,7 @@ import { Card } from "./ui/misc";
  * BusinessCard. Links to the representative (top-ranked) branch — there's no separate
  * /brand/{slug} landing page in v1; that branch's page has the branch switcher.
  */
-export function BrandCard({ business }: { business: BusinessResponse }) {
+export function BrandCard({ business, matchReasons }: { business: BusinessResponse; matchReasons?: string[] }) {
   const { t, tn } = useLanguage();
   const photo = business.photoUrls[0] ?? business.coverPhotoUrl ?? null;
   const rating = business.brandAverageRating ?? business.averageRating;
@@ -64,6 +65,7 @@ export function BrandCard({ business }: { business: BusinessResponse }) {
               ({tn("business_card.rating_count", business.reviewCount, { n: formatReviewCount(business.reviewCount) })})
             </span>
           </div>
+          <MatchReasons reasons={matchReasons} className="mt-2" />
         </div>
       </Link>
 
