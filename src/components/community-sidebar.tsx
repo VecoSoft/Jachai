@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Bookmark, Compass, HelpCircle, Home, MapPin, MessageSquare, Settings, Star, Tag, UserCheck, Users } from "lucide-react";
+import { Bookmark, Compass, HelpCircle, Home, MapPin, MessageSquare, Search, Settings, Star, Tag, UserCheck, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useAuthModal } from "@/lib/auth-modal-context";
 import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
@@ -22,6 +22,7 @@ interface NavItem {
 
 const COMMUNITY_ITEMS: NavItem[] = [
   { href: "/community", label: "Home", icon: Home, isActive: (p, params) => p === "/community" && !params.get("postType") },
+  { href: "/community/search", label: "Search", icon: Search },
   { href: "/community/explore", label: "Explore", icon: Compass },
   {
     href: "/community?postType=QUESTION",

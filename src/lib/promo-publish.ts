@@ -35,3 +35,36 @@ export async function downloadImage(url: string, filename: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(href), 5000);
 }
+
+/**
+ * V61: an owner's image from their device, re-encoded in the browser as a JPEG no larger than
+ * `maxSide` px — so PNG/WebP/huge phone photos all render reliably on the server and upload fast.
+ * Transparent areas become white. Returns the JPEG and the original pixel size.
+ */
+export async function toJpeg(file: File, maxSide = 2160, quality = 0.9): Promise<{ blob: Blob; width: number; height: number }> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("That file couldn't be opened as an image."));
+      el.src = url;
+    });
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
+    const scale = Math.min(1, maxSide / Math.max(width, height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Your browser couldn't prepare the image.");
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (!blob) throw new Error("Your browser couldn't prepare the image.");
+    return { blob, width, height };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}

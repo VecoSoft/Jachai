@@ -10,6 +10,7 @@ import { errorMessage, useToast } from "@/lib/toast-context";
 import { avatarColorClass, avatarInitials, formatMonthYear } from "@/lib/utils";
 import type { CommunityFollowListItem } from "@/lib/types";
 import { Button } from "./ui/button";
+import { CommunityGenderBadge } from "./community-gender-badge";
 
 /** Shared row list for the Following and Followers pages — same card, different data source and empty copy. */
 export function CommunityFollowList({
@@ -86,6 +87,7 @@ function FollowRow({
         <p className="flex items-center gap-1 truncate text-sm font-semibold text-ink-800">
           {displayName}
           {item.author.verified && <BadgeCheck size={13} className="shrink-0 text-brand-600" aria-label="Verified member" />}
+          {item.author.communityUsername && <CommunityGenderBadge gender={item.author.gender} />}
         </p>
         <p className="truncate text-xs text-ink-400">
           {item.author.reviewCount} review{item.author.reviewCount === 1 ? "" : "s"}

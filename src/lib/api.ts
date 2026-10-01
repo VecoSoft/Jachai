@@ -6,6 +6,9 @@ import {
   setStoredTokens,
 } from "./storage";
 import type {
+  PromoUploadSlot,
+  CommunityGender,
+  CommunityIdentityResponse,
   ApiError,
   AuditLog,
   AutoReply,
@@ -618,6 +621,13 @@ export const communityApi = {
   following: (userId: string, page = 0, size = 20) =>
     request<PageResponse<CommunityFollowListItem>>(`/api/v1/community/users/${userId}/following`, { query: { page, size } }),
 
+  /** V60 Community search — live posts whose title/body contain every word. */
+  searchPosts: (q: string, page = 0, size = 10) =>
+    request<PageResponse<CommunityPostResponse>>("/api/v1/community/search/posts", { query: { q, page, size } }),
+  /** V60 Community search — people by community username only (never real names). */
+  searchPeople: (q: string, page = 0, size = 20) =>
+    request<PageResponse<CommunityFollowListItem>>("/api/v1/community/search/people", { query: { q, page, size } }),
+
   followers: (userId: string, page = 0, size = 20) =>
     request<PageResponse<CommunityFollowListItem>>(`/api/v1/community/users/${userId}/followers`, { query: { page, size } }),
 
@@ -629,11 +639,15 @@ export const communityApi = {
 
   suggestUsername: () => request<{ suggestion: string }>("/api/v1/community/username/suggestion"),
 
-  setUsername: (username: string) =>
-    request<{ communityUsername: string }>("/api/v1/community/username", {
+  /** V59: `gender` is required the first time; omit it on a rename to keep the current one. */
+  setUsername: (username: string, gender?: CommunityGender | null) =>
+    request<CommunityIdentityResponse>("/api/v1/community/username", {
       method: "POST",
-      body: { username },
+      body: { username, gender: gender ?? null },
     }),
+  /** V59: pick/change the M/F badge and/or show or hide it. */
+  updateGender: (body: { gender?: CommunityGender; visible?: boolean }) =>
+    request<CommunityIdentityResponse>("/api/v1/community/gender", { method: "PUT", body }),
 
   getProfile: (username: string) =>
     request<CommunityProfileResponse>(`/api/v1/community/profile/${encodeURIComponent(username)}`, { auth: false }),
@@ -1199,6 +1213,9 @@ export interface CaptionRequestBody {
 export const promoApi = {
   // ---- Design Studio (owner) ----
   studio: (businessId: string) => request<StudioData>(`/api/v1/promo/businesses/${businessId}/studio`),
+  /** V61: a pre-signed slot for the owner's own banner/photo. */
+  uploadSlot: (businessId: string) =>
+    request<PromoUploadSlot>(`/api/v1/promo/businesses/${businessId}/uploads`, { method: "POST" }),
   previewModel: (businessId: string, body: CreativeRequestBody) =>
     request<PromoRenderModel>(`/api/v1/promo/businesses/${businessId}/render-model`, { method: "POST", body }),
   saveCreative: (businessId: string, body: CreativeRequestBody) =>

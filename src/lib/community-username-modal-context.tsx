@@ -1,6 +1,15 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import type { UserProfile } from "./types";
+
+/**
+ * Whether this account must finish Community setup before posting/commenting: a username, and
+ * (V59) a Male/Female choice — accounts from before V59 have a username but no gender yet.
+ */
+export function needsCommunitySetup(profile: UserProfile | null | undefined): boolean {
+  return !profile?.communityUsername || !profile.communityGender;
+}
 
 interface CommunityUsernameModalContextValue {
   open: boolean;

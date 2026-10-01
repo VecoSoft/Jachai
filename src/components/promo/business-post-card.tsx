@@ -310,11 +310,22 @@ export function BusinessPostCard({
       )}
 
       {promo?.squareUrl && (
-        <div className="relative overflow-hidden rounded-xl border border-ink-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={promo.squareUrl} alt={post.title ?? business.name} className="aspect-square w-full object-cover" loading="lazy" />
+        // Feed: the wide (1200×630) render on tablet/desktop so a promo takes about as much room as
+        // a normal post; phones keep the square, which already fits the screen. The post page
+        // shows the square, capped so it never dominates the page.
+        <div className={cn("relative overflow-hidden rounded-xl border border-ink-100", detail && "mx-auto w-full max-w-md")}>
+          <picture>
+            {!detail && promo.ogUrl && <source media="(min-width: 640px)" srcSet={promo.ogUrl} />}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={promo.squareUrl}
+              alt={post.title ?? business.name}
+              className={cn("block aspect-square w-full object-cover", !detail && promo.ogUrl && "sm:aspect-[1200/630]")}
+              loading="lazy"
+            />
+          </picture>
           {expired && (
-            <span className="absolute left-3 top-3 rounded-full bg-ink-900/85 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
+            <span className="absolute left-3 top-3 rounded-full bg-black/75 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
               {t("promo.expired")}
             </span>
           )}

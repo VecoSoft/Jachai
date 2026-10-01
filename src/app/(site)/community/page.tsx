@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { communityApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
+import { needsCommunitySetup, useCommunityUsernameModal } from "@/lib/community-username-modal-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { useUserLocation } from "@/lib/location-context";
 import { hiddenAds } from "@/lib/promo-session";
@@ -59,7 +59,7 @@ function CommunityPageInner() {
   // "When a user first enters Community, if they do not yet have a Community
   // username" — show the setup modal proactively, not just when they try to post/comment.
   useEffect(() => {
-    if (!promptedForUsername.current && user && profile && !profile.communityUsername) {
+    if (!promptedForUsername.current && user && profile && needsCommunitySetup(profile)) {
       promptedForUsername.current = true;
       openUsernameModal();
     }

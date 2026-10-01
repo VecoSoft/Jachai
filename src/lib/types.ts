@@ -34,6 +34,19 @@ export interface UserProfile {
   communityProfileId: string;
   /** Separate from profilePhotoUrl — the avatar shown publicly next to u/{communityUsername}. */
   communityAvatarUrl: string | null;
+  /** V59: "M"/"F" picked with the Community username — null for accounts that set a username before it existed. */
+  communityGender: CommunityGender | null;
+  /** V59: whether the M/F badge is shown to other people (the owner always sees their own choice). */
+  communityGenderVisible: boolean;
+}
+
+/** V59 community gender badge. */
+export type CommunityGender = "M" | "F";
+
+export interface CommunityIdentityResponse {
+  communityUsername: string;
+  communityGender: CommunityGender | null;
+  communityGenderVisible: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1212,6 +1225,8 @@ export interface CommunityAuthorSummary {
   communityAvatarUrl: string | null;
   /** "Jachai Team" identity on official announcements — not a real community profile (don't link it). */
   official?: boolean;
+  /** V59: M/F badge — null when the member hid it or hasn't chosen yet. */
+  gender?: CommunityGender | null;
 }
 
 export interface CommunityMentionedBusinessSummary {
@@ -1361,7 +1376,26 @@ export interface SponsoredBusiness {
 }
 
 export type CreativeFormat = "SQUARE" | "STORY" | "OG";
-export type PromoTemplateKey = "OFFER_BOLD" | "MENU_HIGHLIGHT" | "MINIMAL" | "EVENT_POSTER" | "RATING_SHOWCASE";
+export type PromoTemplateKey =
+  | "OFFER_BOLD"
+  | "MENU_HIGHLIGHT"
+  | "MINIMAL"
+  | "EVENT_POSTER"
+  | "RATING_SHOWCASE"
+  // V61
+  | "CUSTOM"
+  | "SPLIT_PHOTO"
+  | "PRICE_SPOTLIGHT"
+  | "FESTIVE"
+  | "BIG_ANNOUNCEMENT"
+  // V62 premium
+  | "LUXE"
+  | "MAGAZINE"
+  | "GLASS"
+  | "POLAROID";
+
+/** V61: how an owner-uploaded banner sits in each format — whole image, or filling the frame (cropped). */
+export type PromoImageFit = "FIT" | "FILL";
 
 /** Mirrors promo.PromoRenderModel — facts are always read from the DB by the server. */
 export interface PromoRenderModel {
@@ -1385,6 +1419,8 @@ export interface PromoRenderModel {
   event: { title: string | null; start: string; end: string | null; location: string | null } | null;
   shareUrl: string;
   expired: boolean;
+  /** V61: placement of the uploaded banner on the CUSTOM template. */
+  imageFit?: PromoImageFit | null;
 }
 
 export interface CreativeData {
@@ -1400,6 +1436,7 @@ export interface CreativeData {
   showRating: boolean;
   showQr: boolean;
   showPrice: boolean;
+  imageFit?: PromoImageFit | null;
 }
 
 export interface CreativeView {
@@ -1446,6 +1483,16 @@ export interface StudioData {
   postsRemainingThisWeek: number;
   captionAiEnabled: boolean;
   boostsEnabled: boolean;
+  /** V61: owners may upload their own banner/photos; `uploads` = recent ones, newest first. */
+  uploadsEnabled: boolean;
+  uploads: string[];
+}
+
+/** V61: pre-signed slot for an owner-uploaded promo image (always JPEG). */
+export interface PromoUploadSlot {
+  uploadUrl: string;
+  objectKey: string;
+  url: string;
 }
 
 export interface CaptionResult {
@@ -1649,6 +1696,8 @@ export interface CommunityProfileResponse {
   followerCount: number;
   followingCount: number;
   communityAvatarUrl: string | null;
+  /** V59: M/F badge — null when hidden or not chosen yet. */
+  gender?: CommunityGender | null;
 }
 
 /** One row of a Following/Followers list. */

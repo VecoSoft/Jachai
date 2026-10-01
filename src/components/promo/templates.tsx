@@ -22,12 +22,28 @@ export const FORMAT_SIZE: Record<CreativeFormat, { width: number; height: number
   OG: { width: 1200, height: 630 },
 };
 
-export const TEMPLATE_KEYS: PromoTemplateKey[] = ["OFFER_BOLD", "MENU_HIGHLIGHT", "MINIMAL", "EVENT_POSTER", "RATING_SHOWCASE"];
+export const TEMPLATE_KEYS: PromoTemplateKey[] = [
+  "OFFER_BOLD",
+  "MENU_HIGHLIGHT",
+  "MINIMAL",
+  "EVENT_POSTER",
+  "RATING_SHOWCASE",
+  "CUSTOM",
+  "SPLIT_PHOTO",
+  "PRICE_SPOTLIGHT",
+  "FESTIVE",
+  "BIG_ANNOUNCEMENT",
+  "LUXE",
+  "MAGAZINE",
+  "GLASS",
+  "POLAROID",
+];
 
 export const PROMO_FONT_FAMILY = "Hind Siliguri";
 const BRAND_RED = "#C8102E";
 const INK = "#111827";
 const MUTED = "#4B5563";
+const GOLD = "#F5C542";
 
 // ---------------------------------------------------------------------------
 // Text shaping contract (implemented server-side by src/lib/promo-shaper.ts)
@@ -69,6 +85,7 @@ const LABELS = {
     newOn: "New on Jachai",
     scan: "Scan to visit",
     expired: "EXPIRED",
+    uploadHint: "Upload your banner",
   },
   bn: {
     validUntil: (d: string) => `${d} পর্যন্ত`,
@@ -78,6 +95,7 @@ const LABELS = {
     newOn: "Jachai-তে নতুন",
     scan: "স্ক্যান করুন",
     expired: "মেয়াদ শেষ",
+    uploadHint: "আপনার ব্যানার আপলোড করুন",
   },
 } as const;
 
@@ -566,12 +584,575 @@ function RatingShowcase(c: Ctx) {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// V61 templates
+// ---------------------------------------------------------------------------
+
+/**
+ * "Your own design": the owner's uploaded banner, placed into each format exactly as designed —
+ * no text drawn on top. FIT shows the whole image on a brand-colour backdrop; FILL crops to fill.
+ */
+function Custom(c: Ctx) {
+  const { m, w, h, u, lang } = c;
+  const k = c.format === "OG" ? 0.58 : u;
+  if (!m.photoUrl) {
+    return (
+      <div style={{ ...flexCol, width: w, height: h, alignItems: "center", justifyContent: "center", gap: 24 * k, background: "#F3F4F6" }}>
+        <div style={{ display: "flex", width: 140 * k, height: 140 * k, borderRadius: 28 * k, border: `${6 * k}px dashed #9CA3AF` }} />
+        {tx(c, LABELS[lang].uploadHint, { size: 48 * k, weight: 600, color: MUTED, maxWidth: w * 0.8, align: "center", lines: 2 })}
+      </div>
+    );
+  }
+  const fill = m.imageFit === "FILL";
+  return (
+    <div style={{ display: "flex", width: w, height: h, alignItems: "center", justifyContent: "center", backgroundImage: `linear-gradient(135deg, ${m.accentColor}, ${INK})` }}>
+      <img src={m.photoUrl} alt="" width={w} height={h} style={{ width: w, height: h, objectFit: fill ? "cover" : "contain" }} />
+    </div>
+  );
+}
+
+function headlineOf(m: PromoRenderModel): string {
+  return m.headline ?? m.event?.title ?? m.offer?.headlineText ?? m.menuItem?.name ?? m.businessName;
+}
+
+/** Photo on top (left on OG), a clean white text panel with an accent rule. */
+function SplitPhoto(c: Ctx) {
+  const { m, format, w, h, u } = c;
+  const og = format === "OG";
+  const photo = m.photoUrl ?? m.menuItem?.photoUrl ?? null;
+  const panel = (k: number, width: number, story: boolean) => (
+    <div
+      style={{
+        ...flexCol,
+        flexGrow: 1,
+        width,
+        padding: 52 * k,
+        justifyContent: "space-between",
+        background: "#FFFFFF",
+        ...(og ? { borderLeft: `${12 * k}px solid ${m.accentColor}` } : { borderTop: `${12 * k}px solid ${m.accentColor}` }),
+      }}
+    >
+      <div style={{ ...flexRow, gap: 16 * k }}>
+        <Logo c={c} size={64 * k} ring={m.accentColor} />
+        <div style={{ ...flexCol }}>
+          {tx(c, m.businessName, { size: 30 * k, weight: 700, color: INK, maxWidth: width - 200 * k })}
+          {tx(c, m.areaName, { size: 24 * k, color: MUTED, maxWidth: width - 200 * k })}
+        </div>
+      </div>
+      <div style={{ ...flexCol, gap: 12 * k }}>
+        {tx(c, headlineOf(m), { size: (story ? 88 : 70) * k, weight: 700, color: INK, maxWidth: width - 104 * k, lines: 2, lineHeight: 1.08 })}
+        {tx(c, m.subline, { size: 32 * k, color: MUTED, maxWidth: width - 104 * k, lines: story ? 3 : 1, lineHeight: 1.3 })}
+        <PriceLine c={c} size={54 * k} color={m.accentColor} maxWidth={width - 104 * k} />
+      </div>
+      <div style={{ ...flexRow, justifyContent: "space-between", alignItems: "flex-end" }}>
+        <JachaiMark c={c} size={28 * k} color={m.accentColor} />
+        <Qr c={c} size={(story ? 170 : 120) * k} dark />
+      </div>
+    </div>
+  );
+  if (og) {
+    return (
+      <div style={{ ...flexRow, width: w, height: h, alignItems: "stretch" }}>
+        <Photo c={c} width={560} height={h} url={photo} />
+        {panel(0.62, w - 560, false)}
+      </div>
+    );
+  }
+  const story = format === "STORY";
+  return (
+    <div style={{ ...flexCol, width: w, height: h }}>
+      <Photo c={c} width={w} height={(story ? 1000 : 540) * u} url={photo} />
+      {panel(u, w, story)}
+    </div>
+  );
+}
+
+/** A big round price tag over the item photo, on the brand colour. */
+function PriceSpotlight(c: Ctx) {
+  const { m, format, w, h, u, lang } = c;
+  const L = LABELS[lang];
+  const photo = m.photoUrl ?? m.menuItem?.photoUrl ?? null;
+  const name = m.menuItem?.name ?? m.offer?.title ?? headlineOf(m);
+  const price = formatPrice(m.offer?.offerPrice ?? m.menuItem?.price ?? null) ?? m.menuItem?.priceText ?? m.offer?.headlineText ?? null;
+  const oldPrice = m.offer?.originalPrice != null && m.offer?.offerPrice != null ? formatPrice(m.offer.originalPrice) : null;
+  const valid = m.offer?.validUntil ? L.validUntil(formatDay(m.offer.validUntil, lang)) : null;
+
+  const tag = (size: number) =>
+    m.showPrice && price ? (
+      <div
+        style={{
+          ...flexCol,
+          position: "absolute",
+          right: size * 0.08,
+          bottom: size * 0.08,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          background: "#FFFFFF",
+          alignItems: "center",
+          justifyContent: "center",
+          border: `${size * 0.035}px solid ${GOLD}`,
+        }}
+      >
+        {oldPrice && tx(c, oldPrice, { size: size * 0.13, color: MUTED, maxWidth: size * 0.8, align: "center", strike: true })}
+        {tx(c, price, { size: size * (Array.from(price).length > 6 ? 0.17 : 0.22), weight: 700, color: m.accentColor, maxWidth: size * 0.84, align: "center", lineHeight: 1.05, lines: 2 })}
+      </div>
+    ) : null;
+
+  if (format === "OG") {
+    const colW = w - 630 - 88;
+    return (
+      <div style={{ ...flexRow, width: w, height: h, background: m.accentColor, alignItems: "stretch" }}>
+        <div style={{ display: "flex", position: "relative", width: 630, height: 630 }}>
+          <Photo c={c} width={630} height={630} url={photo} />
+          {tag(230)}
+        </div>
+        <div style={{ ...flexCol, width: w - 630, padding: 44, justifyContent: "space-between" }}>
+          <div style={{ ...flexRow, gap: 14 }}>
+            <Logo c={c} size={56} />
+            {tx(c, m.businessName, { size: 26, weight: 700, color: "#FFFFFF", maxWidth: colW - 70 })}
+          </div>
+          {tx(c, name, { size: 56, weight: 700, color: "#FFFFFF", maxWidth: colW, lines: 3, lineHeight: 1.1 })}
+          <Chip c={c} text={valid} size={24} bg="#FFFFFF" color={m.accentColor} maxWidth={colW} />
+        </div>
+      </div>
+    );
+  }
+  const story = format === "STORY";
+  const pad = 56 * u;
+  const inner = w - pad * 2;
+  const photoH = (story ? 980 : 520) * u;
+  return (
+    <div style={{ ...flexCol, width: w, height: h, background: m.accentColor, padding: pad, justifyContent: "space-between" }}>
+      <div style={{ ...flexRow, justifyContent: "space-between" }}>
+        <div style={{ ...flexRow, gap: 18 * u }}>
+          <Logo c={c} size={76 * u} />
+          {tx(c, m.businessName, { size: 34 * u, weight: 700, color: "#FFFFFF", maxWidth: inner - 260 * u })}
+        </div>
+        <JachaiMark c={c} size={26 * u} color="#FFFFFF" />
+      </div>
+      <div style={{ display: "flex", position: "relative", width: inner, height: photoH }}>
+        <Photo c={c} width={inner} height={photoH} radius={40 * u} url={photo} />
+        {tag((story ? 330 : 270) * u)}
+      </div>
+      <div style={{ ...flexRow, justifyContent: "space-between", alignItems: "flex-end", gap: 24 * u }}>
+        <div style={{ ...flexCol, gap: 16 * u }}>
+          {tx(c, name, { size: (story ? 84 : 62) * u, weight: 700, color: "#FFFFFF", maxWidth: inner - (m.showQr && c.qr ? 190 * u : 0), lines: 2, lineHeight: 1.08 })}
+          <Chip c={c} text={valid} size={28 * u} bg="#FFFFFF" color={m.accentColor} maxWidth={inner} />
+        </div>
+        <Qr c={c} size={(story ? 170 : 140) * u} />
+      </div>
+    </div>
+  );
+}
+
+function Dots({ count, size }: { count: number; size: number }) {
+  return (
+    <div style={{ ...flexRow, gap: size * 1.4, justifyContent: "center" }}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} style={{ display: "flex", width: size, height: size, borderRadius: size / 2, background: GOLD, opacity: i % 2 === 0 ? 1 : 0.55 }} />
+      ))}
+    </div>
+  );
+}
+
+/** Eid / Puja / Pohela Boishakh greeting or offer — deep backdrop, gold frame, centred type. */
+function Festive(c: Ctx) {
+  const { m, format, w, h, u } = c;
+  const og = format === "OG";
+  const story = format === "STORY";
+  const k = og ? 0.56 : u;
+  const pad = 44 * k;
+  const frameW = w - pad * 2;
+  const inner = frameW - 120 * k;
+  const offerLine = m.offer?.headlineText ?? null;
+  return (
+    <div style={{ display: "flex", width: w, height: h, padding: pad, backgroundImage: `linear-gradient(160deg, ${m.accentColor}, #1A0B2E)` }}>
+      <div
+        style={{
+          ...flexCol,
+          width: frameW,
+          height: h - pad * 2,
+          border: `${5 * k}px solid ${GOLD}`,
+          borderRadius: 36 * k,
+          padding: `${36 * k}px ${60 * k}px`,
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Dots count={og ? 11 : 9} size={12 * k} />
+        <div style={{ ...flexCol, alignItems: "center", gap: (story ? 34 : og ? 14 : 22) * k }}>
+          {!og && <Logo c={c} size={120 * k} ring={GOLD} />}
+          {tx(c, m.businessName, { size: 34 * k, weight: 600, color: GOLD, maxWidth: inner, align: "center" })}
+          {tx(c, headlineOf(m), { size: (story ? 112 : og ? 104 : 92) * k, weight: 700, color: "#FFFFFF", maxWidth: inner, align: "center", lines: og ? 2 : 3, lineHeight: 1.1 })}
+          {tx(c, m.subline, { size: 36 * k, color: "#FFFFFF", opacity: 0.9, maxWidth: inner, align: "center", lines: story ? 3 : og ? 1 : 2, lineHeight: 1.3 })}
+          {offerLine && (
+            <div style={{ display: "flex", padding: `${12 * k}px ${36 * k}px`, borderRadius: 999, background: GOLD }}>
+              {tx(c, offerLine, { size: 40 * k, weight: 700, color: "#1A0B2E", maxWidth: inner - 72 * k })}
+            </div>
+          )}
+        </div>
+        <div style={{ ...flexCol, alignItems: "center", gap: 14 * k }}>
+          {!og && <Qr c={c} size={(story ? 170 : 120) * k} />}
+          <JachaiMark c={c} size={24 * k} color={GOLD} />
+          <Dots count={og ? 11 : 9} size={12 * k} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A huge headline on the brand colour — needs no photo, so it works for every business. */
+function BigAnnouncement(c: Ctx) {
+  const { m, format, w, h, u } = c;
+  const og = format === "OG";
+  const story = format === "STORY";
+  const k = og ? 0.58 : u;
+  const pad = 72 * k;
+  const inner = w - pad * 2;
+  return (
+    <div style={{ ...flexCol, position: "relative", width: w, height: h, padding: pad, background: m.accentColor, justifyContent: "space-between", overflow: "hidden" }}>
+      <div style={{ display: "flex", position: "absolute", top: -260 * k, right: -220 * k, width: 720 * k, height: 720 * k, borderRadius: 360 * k, background: "rgba(255,255,255,0.10)" }} />
+      <div style={{ display: "flex", position: "absolute", bottom: -180 * k, left: -160 * k, width: 420 * k, height: 420 * k, borderRadius: 210 * k, background: "rgba(0,0,0,0.12)" }} />
+      <div style={{ display: "flex", width: 120 * k, height: 14 * k, borderRadius: 7 * k, background: "#FFFFFF" }} />
+      <div style={{ ...flexCol, gap: 24 * k }}>
+        {tx(c, headlineOf(m), { size: (story ? 150 : og ? 120 : 124) * k, weight: 700, color: "#FFFFFF", maxWidth: inner, lines: og ? 2 : story ? 5 : 4, lineHeight: 1.02 })}
+        {tx(c, m.subline, { size: (story ? 46 : 40) * k, color: "#FFFFFF", opacity: 0.92, maxWidth: inner, lines: story ? 4 : 2, lineHeight: 1.3 })}
+      </div>
+      <div style={{ ...flexRow, justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div style={{ ...flexRow, gap: 18 * k }}>
+          <Logo c={c} size={84 * k} />
+          <div style={{ ...flexCol }}>
+            {tx(c, m.businessName, { size: 34 * k, weight: 700, color: "#FFFFFF", maxWidth: inner - 360 * k })}
+            {tx(c, [m.areaName, m.cityName].filter(Boolean).join(", "), { size: 26 * k, color: "#FFFFFF", opacity: 0.85, maxWidth: inner - 360 * k })}
+          </div>
+        </div>
+        {m.showQr && c.qr ? <Qr c={c} size={(story ? 180 : 140) * k} /> : <JachaiMark c={c} size={28 * k} color="#FFFFFF" />}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// V62 premium templates
+// ---------------------------------------------------------------------------
+
+const CHAMPAGNE = "#D4AF6A";
+const IVORY = "#F5F1E8";
+
+/** Current price text for premium layouts — only from the model, and only when the owner shows prices. */
+function priceOf(m: PromoRenderModel): { now: string | null; was: string | null } {
+  if (!m.showPrice) return { now: null, was: null };
+  const now = formatPrice(m.offer?.offerPrice ?? m.menuItem?.price ?? null) ?? m.menuItem?.priceText ?? null;
+  const was = now && m.offer?.originalPrice != null && m.offer?.offerPrice != null ? formatPrice(m.offer.originalPrice) : null;
+  return { now, was };
+}
+
+/** Photo in an arch (rounded top) with a thin gold keyline around it. */
+function ArchPhoto({ c, width, height }: { c: Ctx; width: number; height: number }) {
+  const { m } = c;
+  const src = m.photoUrl ?? m.menuItem?.photoUrl ?? null;
+  const gap = Math.max(6, width * 0.025);
+  const inW = width - gap * 2;
+  const inH = height - gap * 2;
+  const outer = { borderTopLeftRadius: width / 2, borderTopRightRadius: width / 2, borderBottomLeftRadius: width * 0.04, borderBottomRightRadius: width * 0.04 };
+  const inner = { borderTopLeftRadius: inW / 2, borderTopRightRadius: inW / 2, borderBottomLeftRadius: inW * 0.03, borderBottomRightRadius: inW * 0.03 };
+  return (
+    <div style={{ display: "flex", width, height, padding: gap, border: `${Math.max(2, width * 0.005)}px solid ${CHAMPAGNE}`, ...outer }}>
+      {src ? (
+        <img src={src} alt="" width={inW} height={inH} style={{ width: inW, height: inH, objectFit: "cover", ...inner }} />
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: inW, height: inH, backgroundImage: `linear-gradient(160deg, ${m.accentColor}, #0E0E10)`, ...inner }}>
+          {tx(c, Array.from(m.businessName.trim())[0]?.toUpperCase() ?? "J", { size: inW * 0.32, weight: 700, color: CHAMPAGNE, maxWidth: inW, align: "center", lineHeight: 1 })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GoldRule({ width, k }: { width: number; k: number }) {
+  return <div style={{ display: "flex", width, height: Math.max(2, 2 * k), background: CHAMPAGNE }} />;
+}
+
+/** Luxe: near-black, champagne gold, arch-framed photo — fine dining, salons, boutiques. */
+function Luxe(c: Ctx) {
+  const { m, format, w, h, u, lang } = c;
+  const L = LABELS[lang];
+  const { now, was } = priceOf(m);
+  const valid = m.offer?.validUntil ? L.validUntil(formatDay(m.offer.validUntil, lang)) : null;
+
+  const text = (k: number, width: number, center: boolean, big: number) => {
+    const align = center ? "center" : "left";
+    return (
+      <div style={{ ...flexCol, gap: 22 * k, alignItems: center ? "center" : "flex-start" }}>
+        {tx(c, m.businessName, { size: 30 * k, weight: 600, color: CHAMPAGNE, maxWidth: width, align })}
+        {tx(c, headlineOf(m), { size: big * k, weight: 700, color: IVORY, maxWidth: width, align, lines: 3, lineHeight: 1.1 })}
+        <GoldRule width={90 * k} k={k} />
+        {tx(c, m.subline, { size: 32 * k, color: "#A8A29E", maxWidth: width, align, lines: 3, lineHeight: 1.35 })}
+        {now && (
+          <div style={{ ...flexRow, gap: 16 * k }}>
+            {was && tx(c, was, { size: 30 * k, color: "#A8A29E", maxWidth: width * 0.35, strike: true })}
+            {tx(c, now, { size: 56 * k, weight: 700, color: CHAMPAGNE, maxWidth: width * 0.6 })}
+          </div>
+        )}
+        {valid && tx(c, valid, { size: 26 * k, color: IVORY, opacity: 0.8, maxWidth: width, align })}
+      </div>
+    );
+  };
+  const footer = (k: number) => (
+    <div style={{ ...flexRow, justifyContent: "space-between", alignItems: "flex-end" }}>
+      <div style={{ ...flexRow, gap: 14 * k }}>
+        <Logo c={c} size={56 * k} ring={CHAMPAGNE} />
+        {tx(c, [m.areaName, m.cityName].filter(Boolean).join(", "), { size: 24 * k, color: "#A8A29E", maxWidth: 420 * k })}
+      </div>
+      {m.showQr && c.qr ? <Qr c={c} size={120 * k} /> : <JachaiMark c={c} size={24 * k} color={CHAMPAGNE} />}
+    </div>
+  );
+
+  if (format === "OG") {
+    const k = 0.6;
+    return (
+      <div style={{ ...flexRow, width: w, height: h, background: "#0E0E10", padding: 44, gap: 44, alignItems: "center" }}>
+        <ArchPhoto c={c} width={360} height={540} />
+        <div style={{ ...flexCol, width: w - 360 - 132, height: 540, justifyContent: "space-between" }}>
+          {text(k, w - 360 - 132, false, 96)}
+          {footer(k)}
+        </div>
+      </div>
+    );
+  }
+  if (format === "STORY") {
+    const pad = 72 * u;
+    const inner = w - pad * 2;
+    return (
+      <div style={{ ...flexCol, width: w, height: h, background: "#0E0E10", padding: pad, alignItems: "center", justifyContent: "space-between" }}>
+        <ArchPhoto c={c} width={700 * u} height={880 * u} />
+        {text(u, inner, true, 92)}
+        <div style={{ ...flexCol, width: inner }}>{footer(u)}</div>
+      </div>
+    );
+  }
+  const pad = 72 * u;
+  const inner = w - pad * 2;
+  const archW = 400 * u;
+  const colW = inner - archW - 56 * u;
+  return (
+    <div style={{ ...flexCol, width: w, height: h, background: "#0E0E10", padding: pad, justifyContent: "space-between" }}>
+      <div style={{ ...flexRow, gap: 56 * u, alignItems: "center" }}>
+        <ArchPhoto c={c} width={archW} height={700 * u} />
+        <div style={{ ...flexCol, width: colW }}>{text(u, colW, false, 70)}</div>
+      </div>
+      {footer(u)}
+    </div>
+  );
+}
+
+/** Magazine cover: full-bleed photo, masthead, cover lines and a price badge. */
+function Magazine(c: Ctx) {
+  const { m, format, w, h, u } = c;
+  const og = format === "OG";
+  const story = format === "STORY";
+  const k = og ? 0.58 : u;
+  const pad = 64 * k;
+  const inner = w - pad * 2;
+  const { now, was } = priceOf(m);
+  const badgeText = now ?? m.offer?.headlineText ?? null;
+  const badge = (size: number) =>
+    badgeText ? (
+      <div style={{ ...flexCol, width: size, height: size, borderRadius: size / 2, background: m.accentColor, alignItems: "center", justifyContent: "center", border: `${size * 0.03}px solid #FFFFFF`, transform: "rotate(-8deg)" }}>
+        {was && tx(c, was, { size: size * 0.12, color: "#FFFFFF", opacity: 0.85, maxWidth: size * 0.8, align: "center", strike: true })}
+        {tx(c, badgeText, { size: size * (Array.from(badgeText).length > 7 ? 0.15 : 0.21), weight: 700, color: "#FFFFFF", maxWidth: size * 0.82, align: "center", lines: 2, lineHeight: 1.05 })}
+      </div>
+    ) : null;
+  return (
+    <div style={{ display: "flex", position: "relative", width: w, height: h, background: INK }}>
+      <Photo c={c} width={w} height={h} url={m.photoUrl ?? m.menuItem?.photoUrl ?? null} showInitial={false} />
+      <div
+        style={{
+          ...flexCol,
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: w,
+          height: h,
+          padding: pad,
+          justifyContent: "space-between",
+          backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.62), rgba(0,0,0,0.05) 30%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.82))",
+        }}
+      >
+        <div style={{ ...flexCol, gap: 10 * k }}>
+          {tx(c, m.businessName, { size: (story ? 120 : og ? 104 : 108) * k, weight: 700, color: "#FFFFFF", maxWidth: inner, lineHeight: 1 })}
+          <div style={{ ...flexRow, gap: 16 * k }}>
+            <div style={{ display: "flex", width: 70 * k, height: 5 * k, background: m.accentColor }} />
+            {tx(c, [m.areaName, m.cityName].filter(Boolean).join(" · "), { size: 28 * k, weight: 600, color: "#FFFFFF", maxWidth: inner - 100 * k })}
+          </div>
+        </div>
+        <div style={{ ...flexRow, justifyContent: "flex-end" }}>{badge((story ? 300 : og ? 330 : 250) * k)}</div>
+        <div style={{ ...flexCol, gap: 18 * k }}>
+          <div style={{ ...flexRow, gap: 22 * k, alignItems: "stretch" }}>
+            <div style={{ display: "flex", width: 10 * k, background: m.accentColor, borderRadius: 5 * k }} />
+            <div style={{ ...flexCol, gap: 10 * k }}>
+              {tx(c, headlineOf(m), { size: (story ? 92 : 76) * k, weight: 700, color: "#FFFFFF", maxWidth: inner - 40 * k, lines: og ? 2 : 3, lineHeight: 1.06 })}
+              {tx(c, m.subline, { size: 34 * k, color: "#FFFFFF", opacity: 0.92, maxWidth: inner - 40 * k, lines: 2, lineHeight: 1.3 })}
+            </div>
+          </div>
+          <div style={{ ...flexRow, justifyContent: "space-between", alignItems: "flex-end" }}>
+            <JachaiMark c={c} size={28 * k} color="#FFFFFF" />
+            <Qr c={c} size={(story ? 170 : 130) * k} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Glass: vivid gradient, soft light blobs and a frosted card — launches and offers. */
+function Glass(c: Ctx) {
+  const { m, format, w, h, u } = c;
+  const og = format === "OG";
+  const story = format === "STORY";
+  const k = og ? 0.62 : u;
+  const pad = 64 * k;
+  const { now, was } = priceOf(m);
+  const photoSrc = m.photoUrl ?? m.menuItem?.photoUrl ?? null;
+  const circle = (size: number) => (
+    <div style={{ display: "flex", width: size, height: size, borderRadius: size / 2, border: `${8 * k}px solid rgba(255,255,255,0.85)`, overflow: "hidden" }}>
+      <Photo c={c} width={size - 16 * k} height={size - 16 * k} radius={size / 2} url={photoSrc} />
+    </div>
+  );
+  const pill = now ? (
+    <div style={{ ...flexRow, alignSelf: og ? "flex-start" : "center", gap: 14 * k, padding: `${14 * k}px ${34 * k}px`, borderRadius: 999, background: "#FFFFFF" }}>
+      {was && tx(c, was, { size: 28 * k, color: MUTED, maxWidth: 200 * k, strike: true })}
+      {tx(c, now, { size: 46 * k, weight: 700, color: m.accentColor, maxWidth: 360 * k })}
+    </div>
+  ) : m.offer?.headlineText ? (
+    <div style={{ display: "flex", alignSelf: og ? "flex-start" : "center", padding: `${14 * k}px ${34 * k}px`, borderRadius: 999, background: "#FFFFFF" }}>
+      {tx(c, m.offer.headlineText, { size: 40 * k, weight: 700, color: m.accentColor, maxWidth: 600 * k })}
+    </div>
+  ) : null;
+  const blob = (size: number, top: number, left: number, color: string) => (
+    <div style={{ display: "flex", position: "absolute", top, left, width: size, height: size, borderRadius: size / 2, backgroundImage: `radial-gradient(circle, ${color}, rgba(255,255,255,0) 70%)` }} />
+  );
+  const cardW = w - pad * 2;
+  const textW = og ? cardW - 400 * k - 160 * k : cardW - 120 * k;
+  return (
+    <div style={{ display: "flex", position: "relative", width: w, height: h, padding: pad, alignItems: "center", justifyContent: "center", backgroundImage: `linear-gradient(135deg, ${m.accentColor}, #7C3AED 55%, #F59E0B)` }}>
+      {blob(700 * k, -200 * k, -220 * k, "rgba(255,255,255,0.35)")}
+      {blob(600 * k, h - 380 * k, w - 380 * k, "rgba(255,214,102,0.45)")}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: og ? "row" : "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: (og ? 48 : story ? 40 : 26) * k,
+          width: cardW,
+          ...(og || story ? { height: h - pad * 2 } : {}),
+          padding: `${(story ? 72 : 52) * k}px ${60 * k}px`,
+          borderRadius: 48 * k,
+          background: "rgba(255,255,255,0.16)",
+          border: `${2 * k}px solid rgba(255,255,255,0.5)`,
+          boxShadow: "0 30px 60px rgba(0,0,0,0.18)",
+        }}
+      >
+        {circle((og ? 400 : story ? 440 : 290) * k)}
+        <div style={{ ...flexCol, alignItems: og ? "flex-start" : "center", gap: 18 * k, width: textW }}>
+          <div style={{ ...flexRow, gap: 14 * k }}>
+            <Logo c={c} size={52 * k} />
+            {tx(c, m.businessName, { size: 30 * k, weight: 700, color: "#FFFFFF", maxWidth: textW - 70 * k })}
+          </div>
+          {tx(c, headlineOf(m), { size: (story ? 96 : 70) * k, weight: 700, color: "#FFFFFF", maxWidth: textW, align: og ? "left" : "center", lines: 2, lineHeight: 1.08 })}
+          {tx(c, m.subline, { size: 32 * k, color: "#FFFFFF", opacity: 0.92, maxWidth: textW, align: og ? "left" : "center", lines: story ? 3 : 1, lineHeight: 1.3 })}
+          {pill}
+          {story && <Qr c={c} size={170 * k} />}
+        </div>
+      </div>
+      <div style={{ display: "flex", position: "absolute", bottom: 30 * k, right: pad }}>
+        <JachaiMark c={c} size={24 * k} color="#FFFFFF" />
+      </div>
+    </div>
+  );
+}
+
+/** Polaroid: a tilted instant-photo print on warm paper — cafés, bakeries, home kitchens. */
+function Polaroid(c: Ctx) {
+  const { m, format, w, h, u } = c;
+  const og = format === "OG";
+  const story = format === "STORY";
+  const k = og ? 0.6 : u;
+  const pad = 64 * k;
+  const { now, was } = priceOf(m);
+  const photoSrc = m.photoUrl ?? m.menuItem?.photoUrl ?? null;
+  const print = (photo: number, tilt: number) => (
+    <div style={{ display: "flex", position: "relative", transform: `rotate(${tilt}deg)` }}>
+      <div style={{ ...flexCol, padding: `${photo * 0.05}px ${photo * 0.05}px ${photo * 0.2}px`, background: "#FFFFFF", boxShadow: "0 18px 40px rgba(60,40,20,0.22)", gap: photo * 0.04 }}>
+        <Photo c={c} width={photo} height={photo} url={photoSrc} />
+        {tx(c, headlineOf(m), { size: photo * 0.075, weight: 600, color: INK, maxWidth: photo, align: "center" })}
+      </div>
+      <div style={{ display: "flex", position: "absolute", top: -photo * 0.04, left: photo * 0.38, width: photo * 0.34, height: photo * 0.09, background: "rgba(255,226,140,0.8)", transform: "rotate(-4deg)" }} />
+    </div>
+  );
+  const details = (width: number, center: boolean) => (
+    <div style={{ ...flexCol, gap: 16 * k, alignItems: center ? "center" : "flex-start" }}>
+      <div style={{ ...flexRow, gap: 14 * k }}>
+        <Logo c={c} size={60 * k} ring={m.accentColor} />
+        <div style={{ ...flexCol }}>
+          {tx(c, m.businessName, { size: 32 * k, weight: 700, color: INK, maxWidth: width - 80 * k })}
+          {tx(c, [m.areaName, m.cityName].filter(Boolean).join(", "), { size: 24 * k, color: MUTED, maxWidth: width - 80 * k })}
+        </div>
+      </div>
+      {tx(c, m.subline, { size: 32 * k, color: "#5B4636", maxWidth: width, align: center ? "center" : "left", lines: 2, lineHeight: 1.3 })}
+      {now && (
+        <div style={{ ...flexRow, gap: 14 * k }}>
+          {was && tx(c, was, { size: 30 * k, color: MUTED, maxWidth: width * 0.35, strike: true })}
+          {tx(c, now, { size: 54 * k, weight: 700, color: m.accentColor, maxWidth: width * 0.6 })}
+        </div>
+      )}
+    </div>
+  );
+  const paper = "#F4ECE1";
+  if (og) {
+    const colW = w - 470 - pad * 2 - 40;
+    return (
+      <div style={{ ...flexRow, width: w, height: h, padding: pad, gap: 40, background: paper, alignItems: "center", borderTop: `${10 * k}px solid ${m.accentColor}` }}>
+        <div style={{ display: "flex", width: 470, justifyContent: "center" }}>{print(330, -4)}</div>
+        <div style={{ ...flexCol, width: colW, gap: 24 }}>
+          {details(colW, false)}
+          <JachaiMark c={c} size={22} color={m.accentColor} />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ ...flexCol, width: w, height: h, padding: pad, background: paper, alignItems: "center", justifyContent: story ? "center" : "space-between", gap: story ? 110 * k : 0, borderTop: `${14 * k}px solid ${m.accentColor}` }}>
+      <div style={{ display: "flex", marginTop: 20 * k }}>{print((story ? 860 : 490) * k, -3)}</div>
+      <div style={{ ...flexRow, width: w - pad * 2, justifyContent: "space-between", alignItems: "flex-end" }}>
+        {details(w - pad * 2 - (m.showQr && c.qr ? 200 * k : 0), false)}
+        <div style={{ ...flexCol, alignItems: "flex-end", gap: 14 * k }}>
+          <Qr c={c} size={(story ? 170 : 140) * k} dark />
+          <JachaiMark c={c} size={24 * k} color={m.accentColor} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TEMPLATES: Record<PromoTemplateKey, (c: Ctx) => ReactNode> = {
   OFFER_BOLD: OfferBold,
   MENU_HIGHLIGHT: MenuHighlight,
   MINIMAL: Minimal,
   EVENT_POSTER: EventPoster,
   RATING_SHOWCASE: RatingShowcase,
+  CUSTOM: Custom,
+  SPLIT_PHOTO: SplitPhoto,
+  PRICE_SPOTLIGHT: PriceSpotlight,
+  FESTIVE: Festive,
+  BIG_ANNOUNCEMENT: BigAnnouncement,
+  LUXE: Luxe,
+  MAGAZINE: Magazine,
+  GLASS: Glass,
+  POLAROID: Polaroid,
 };
 
 /**
@@ -628,14 +1209,15 @@ export function sampleModel(key: PromoTemplateKey, lang: "bn" | "en", variant: "
     showRating: !bare,
     showQr: !bare,
     showPrice: true,
-    offer: key === "OFFER_BOLD" || key === "MENU_HIGHLIGHT"
+    offer: ["OFFER_BOLD", "MENU_HIGHLIGHT", "PRICE_SPOTLIGHT", "FESTIVE", "MAGAZINE", "GLASS", "LUXE"].includes(key)
       ? { title: bn ? "কাচ্চি ১টা কিনলে ১টা ফ্রি" : "Kacchi Buy 1 Get 1", headlineText: "BUY 1 GET 1", originalPrice: 560, offerPrice: 450, validUntil: inAWeek, active: true }
       : null,
-    menuItem: key === "MENU_HIGHLIGHT" || key === "OFFER_BOLD"
+    menuItem: ["MENU_HIGHLIGHT", "OFFER_BOLD", "PRICE_SPOTLIGHT", "LUXE", "MAGAZINE", "GLASS", "POLAROID"].includes(key)
       ? { name: long ? (bn ? "স্পেশাল কাচ্চি বিরিয়ানি উইথ বোরহানি অ্যান্ড ফিরনি (হাফ প্লেট)" : "Special Kacchi Biryani with Borhani and Firni (Half Plate)") : bn ? "কাচ্চি বিরিয়ানি (হাফ)" : "Kacchi Biryani (Half)", price: 450, priceText: null, photoUrl: null }
       : null,
     event: key === "EVENT_POSTER" ? { title: bn ? "শুক্রবার লাইভ গ্রিল নাইট" : "Friday Live Grill Night", start: inAWeek, end: null, location: bn ? "মিরপুর ১০, ঢাকা" : "Mirpur 10, Dhaka" } : null,
     shareUrl: "https://jachai.app/business/sample",
     expired: false,
+    imageFit: "FIT",
   };
 }

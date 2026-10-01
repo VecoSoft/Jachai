@@ -11,6 +11,7 @@ import type { CommunityCommentResponse, CommunityPostResponse, CommunityProfileR
 import { CommunityPostCard } from "@/components/community-post-card";
 import { FollowControl } from "@/components/community-follow-control";
 import { EmptyState, ErrorBanner, PageSpinner } from "@/components/ui/misc";
+import { CommunityGenderBadge } from "@/components/community-gender-badge";
 
 type Tab = "posts" | "comments";
 
@@ -88,6 +89,7 @@ export default function CommunityProfilePage() {
           <div>
             <h1 className="flex items-center gap-1.5 font-display text-xl font-bold text-ink-900">
               u/{profile.communityUsername}
+              <CommunityGenderBadge gender={profile.gender} className="h-5 min-w-5 text-xs" />
               {profile.verified && (
                 <span title="Verified member" className="text-brand-600">
                   ✓

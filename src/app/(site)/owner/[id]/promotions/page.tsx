@@ -137,7 +137,7 @@ export default function OwnerPromotionsPage() {
                 type="button"
                 aria-pressed={days === d}
                 onClick={() => setDays(d)}
-                className={cn("min-h-9 rounded-full px-3 text-xs font-semibold", days === d ? "bg-crimson-50 text-crimson-700 dark:bg-crimson-950/40 dark:text-crimson-300" : "text-ink-500 hover:bg-ink-50")}
+                className={cn("min-h-9 rounded-full px-3 text-xs font-semibold", days === d ? "bg-crimson-50 text-crimson-700 dark:bg-crimson-900/40 dark:text-crimson-300" : "text-ink-500 hover:bg-ink-50")}
               >
                 {t("promo.analytics.last_days", { n: d })}
               </button>

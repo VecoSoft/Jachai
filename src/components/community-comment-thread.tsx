@@ -6,7 +6,7 @@ import { Check } from "lucide-react";
 import { communityApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useAuthModal } from "@/lib/auth-modal-context";
-import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
+import { needsCommunitySetup, useCommunityUsernameModal } from "@/lib/community-username-modal-context";
 import { applyVoteDelta } from "@/lib/community-vote";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { avatarColorClass, avatarInitials, cn, focusRing, interactiveTransition, timeAgo } from "@/lib/utils";
@@ -14,6 +14,7 @@ import { BusinessAvatar, BusinessPill } from "./promo/business-post-card";
 import type { CommunityCommentResponse, CommunityPostVoteType } from "@/lib/types";
 import { Badge } from "./ui/misc";
 import { VoteControls } from "./vote-controls";
+import { CommunityGenderBadge } from "./community-gender-badge";
 
 const MAX_REPLY_DEPTH = 5;
 
@@ -161,7 +162,7 @@ function CommentNode({
       openLogin();
       return;
     }
-    if (!profile?.communityUsername) {
+    if (needsCommunitySetup(profile)) {
       openUsernameModal(() => setReplying(true));
       return;
     }
@@ -249,6 +250,9 @@ function CommentNode({
                 </Link>
               ) : (
                 displayName
+              )}
+              {!comment.business && comment.author.communityUsername && (
+                <CommunityGenderBadge gender={comment.author.gender} className="ml-1" />
               )}
               {isOP && (
                 <Badge tone="crimson" className="ml-1 px-1.5 py-0 text-[10px] uppercase tracking-wide">

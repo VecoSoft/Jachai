@@ -10,10 +10,10 @@ import { useCommunityUsernameModal } from "@/lib/community-username-modal-contex
 import { cn, focusRing, interactiveTransition } from "@/lib/utils";
 import { COMMUNITY_ITEMS, SOCIAL_ITEMS, type NavItem } from "./community-sidebar";
 
-/** The 3 most-reached-for destinations, kept as always-visible icon buttons — everything
+/** The 4 most-reached-for destinations, kept as always-visible icon buttons — everything
  *  else (Questions, Reviews, Discussions, Offers, Following, Followers, Nearby, Settings)
  *  lives behind the menu button instead of a long horizontally-scrolling tab strip. */
-const QUICK_ITEMS = COMMUNITY_ITEMS.filter((i) => i.label === "Home" || i.label === "Explore" || i.label === "Saved");
+const QUICK_ITEMS = COMMUNITY_ITEMS.filter((i) => ["Home", "Search", "Explore", "Saved"].includes(i.label));
 
 /**
  * Icon-first mobile equivalent of CommunitySidebar — a menu button (opens a

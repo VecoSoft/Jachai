@@ -160,7 +160,7 @@ export function BoostSheet({
                 className={cn(
                   "flex min-h-11 w-full items-center justify-between rounded-xl border p-3 text-left",
                   focusRing,
-                  pkg?.id === p.id ? "border-crimson-500 bg-crimson-50 dark:bg-crimson-950/30" : "border-ink-200 hover:border-ink-300"
+                  pkg?.id === p.id ? "border-crimson-500 bg-crimson-50 dark:bg-crimson-900/30" : "border-ink-200 hover:border-ink-300"
                 )}
               >
                 <span>

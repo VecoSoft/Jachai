@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Check, Download, ImageOff, Megaphone, Sparkles, Store, Tag, UtensilsCrossed } from "lucide-react";
+import { CalendarDays, Check, Download, ImageOff, ImagePlus, Megaphone, Sparkles, Store, Tag, Upload, UtensilsCrossed } from "lucide-react";
 import { promoApi } from "@/lib/api";
 import { useLanguage } from "@/lib/language-context";
-import { downloadImage, renderAndUpload } from "@/lib/promo-publish";
+import { downloadImage, renderAndUpload, toJpeg } from "@/lib/promo-publish";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { cn, focusRing } from "@/lib/utils";
 import type {
@@ -14,6 +14,7 @@ import type {
   CommunityPostResponse,
   CreativeData,
   CreativeView,
+  PromoImageFit,
   PromoRenderModel,
   PromoTemplateKey,
   StudioData,
@@ -57,6 +58,10 @@ function localToIso(v: string): string | null {
  * Not a free-form editor — owners choose what to promote, pick a template that's already filled in,
  * and make light edits (headline, subline, accent colour, photo from their own listing, toggles).
  * Prices, offer terms and ratings are never editable: the server supplies them.
+ *
+ * V61: owners aren't tied to our designs — "Your own design" takes a banner they made elsewhere
+ * (uploaded from their device) and turns it into every format, and any template can use an
+ * uploaded photo too.
  */
 export function DesignStudio({
   businessId,
@@ -83,6 +88,10 @@ export function DesignStudio({
   const [subline, setSubline] = useState("");
   const [accent, setAccent] = useState<string>("#C8102E");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [imageFit, setImageFit] = useState<PromoImageFit>("FIT");
+  const [uploads, setUploads] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [showRating, setShowRating] = useState(true);
   const [showQr, setShowQr] = useState(false);
   const [showPrice, setShowPrice] = useState(true);
@@ -106,6 +115,7 @@ export function DesignStudio({
       .studio(businessId)
       .then((s) => {
         setStudio(s);
+        setUploads(s.uploads ?? []);
         if (s.logoColor) setAccent(s.logoColor);
       })
       .catch((err) => setLoadError(errorMessage(err)));
@@ -144,8 +154,9 @@ export function DesignStudio({
       showRating,
       showQr,
       showPrice,
+      imageFit,
     }),
-    [headline, subline, accent, photoUrl, kind, offerId, menuItemId, eventTitle, eventStart, eventEnd, showRating, showQr, showPrice]
+    [headline, subline, accent, photoUrl, kind, offerId, menuItemId, eventTitle, eventStart, eventEnd, showRating, showQr, showPrice, imageFit]
   );
 
   // Facts come from the server; refetch only when the facts-bearing choices change (not on every keystroke).
@@ -178,12 +189,47 @@ export function DesignStudio({
         showRating: showRating && baseModel.averageRating != null,
         showQr,
         showPrice,
+        imageFit,
         event: kind === "EVENT" && data.eventStart ? { title: data.eventTitle, start: data.eventStart, end: data.eventEnd, location: baseModel.event?.location ?? null } : baseModel.event,
       },
-    [baseModel, data, accent, showRating, showQr, showPrice, kind]
+    [baseModel, data, accent, showRating, showQr, showPrice, kind, imageFit]
   );
 
-  const templates = (studio?.templates ?? []).filter((tpl) => !kind || tpl.supportedTypes.includes(kind));
+  const templates = (studio?.templates ?? []).filter(
+    (tpl) => (!kind || tpl.supportedTypes.includes(kind)) && (tpl.key !== "CUSTOM" || studio?.uploadsEnabled)
+  );
+  const custom = templateKey === "CUSTOM";
+
+  function pickTemplate(key: PromoTemplateKey) {
+    setTemplateKey(key);
+    setTemplatePicked(true);
+  }
+
+  /** V61: the owner's own image → JPEG in the browser → pre-signed upload → used right away. */
+  async function uploadImage(file: File) {
+    if (!file.type.startsWith("image/")) {
+      show(t("promo.studio.upload_not_image"), "error");
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      show(t("promo.studio.upload_too_big"), "error");
+      return;
+    }
+    setUploading(true);
+    try {
+      const { blob, width, height } = await toJpeg(file);
+      const slot = await promoApi.uploadSlot(businessId);
+      const res = await fetch(slot.uploadUrl, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: blob });
+      if (!res.ok) throw new Error(t("promo.studio.upload_failed"));
+      setUploads((prev) => [slot.url, ...prev.filter((u) => u !== slot.url)]);
+      setPhotoUrl(slot.url);
+      if (Math.min(width, height) < 600) show(t("promo.studio.upload_small"), "info");
+    } catch (err) {
+      show(errorMessage(err), "error");
+    } finally {
+      setUploading(false);
+    }
+  }
   const model = modelFor(templateKey);
   const signature = JSON.stringify({ templateKey, data });
 
@@ -268,7 +314,7 @@ export function DesignStudio({
   if (loadError) return <ErrorBanner message={loadError} />;
   if (!studio) {
     return (
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         <Skeleton className="aspect-square w-full rounded-xl" />
         <div className="space-y-3">
           <Skeleton className="h-12 w-full rounded-xl" />
@@ -313,11 +359,12 @@ export function DesignStudio({
   ];
 
   const outOfPosts = studio.postsRemainingThisWeek <= 0;
-  const ready = Boolean(model) && (kind !== "OFFER" || offerId) && (kind !== "MENU_ITEM" || menuItemId) && (kind !== "EVENT" || eventStart);
+  const ready =
+    Boolean(model) && (kind !== "OFFER" || offerId) && (kind !== "MENU_ITEM" || menuItemId) && (kind !== "EVENT" || eventStart) && (!custom || Boolean(photoUrl));
   const swatches = Array.from(new Set([...(studio.logoColor ? [studio.logoColor] : []), ...studio.swatches]));
 
   return (
-    <div className="grid gap-6 pb-28 lg:grid-cols-[minmax(0,440px)_1fr] lg:pb-0">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 pb-28 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:pb-0">
       {/* Preview (left on desktop, top on mobile) */}
       <div className="lg:sticky lg:top-20 lg:self-start">
         {model ? (
@@ -339,6 +386,17 @@ export function DesignStudio({
 
       {/* Controls */}
       <div className="space-y-6">
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void uploadImage(file);
+          }}
+        />
         {outOfPosts && (
           <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
             {t("promo.studio.limit_reached")}
@@ -363,7 +421,7 @@ export function DesignStudio({
                   className={cn(
                     "min-h-11 rounded-xl border p-3 text-left text-sm",
                     focusRing,
-                    offerId === o.id ? "border-crimson-500 bg-crimson-50 dark:bg-crimson-950/30" : "border-ink-200 hover:border-ink-300"
+                    offerId === o.id ? "border-crimson-500 bg-crimson-50 dark:bg-crimson-900/30" : "border-ink-200 hover:border-ink-300"
                   )}
                 >
                   <span className="block font-semibold text-ink-900">{o.title}</span>
@@ -421,7 +479,18 @@ export function DesignStudio({
 
         {kind && baseModel && (
           <section>
-            <h2 className="text-sm font-semibold text-ink-900">{t("promo.studio.template")}</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-ink-900">{t("promo.studio.template")}</h2>
+              {studio.uploadsEnabled && !custom && (
+                <button
+                  type="button"
+                  onClick={() => pickTemplate("CUSTOM")}
+                  className={cn("inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-crimson-700 hover:bg-crimson-50", focusRing)}
+                >
+                  <ImagePlus size={16} /> {t("promo.studio.have_own")}
+                </button>
+              )}
+            </div>
             <div className="-mx-1 mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2" role="radiogroup" aria-label={t("promo.studio.template")}>
               {templates.map((tpl) => {
                 const m = modelFor(tpl.key);
@@ -431,10 +500,7 @@ export function DesignStudio({
                     type="button"
                     role="radio"
                     aria-checked={templateKey === tpl.key}
-                    onClick={() => {
-                      setTemplateKey(tpl.key);
-                      setTemplatePicked(true);
-                    }}
+                    onClick={() => pickTemplate(tpl.key)}
                     className={cn("snap-start rounded-xl p-1", focusRing, templateKey === tpl.key ? "ring-2 ring-crimson-500" : "ring-1 ring-ink-100")}
                   >
                     {m && <CreativePreview model={m} width={132} />}
@@ -446,7 +512,79 @@ export function DesignStudio({
           </section>
         )}
 
-        {kind && baseModel && (
+        {kind && baseModel && custom && (
+          <section className="space-y-4" aria-labelledby="own-design-heading">
+            <h2 id="own-design-heading" className="text-sm font-semibold text-ink-900">{t("promo.studio.your_design")}</h2>
+            <p className="text-sm text-ink-600">{t("promo.studio.custom_hint")}</p>
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              disabled={uploading}
+              className={cn(
+                "flex min-h-24 w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-ink-200 px-4 py-5 text-sm font-semibold text-ink-700 hover:border-crimson-400 hover:bg-crimson-50/40 disabled:opacity-60",
+                focusRing
+              )}
+            >
+              <Upload size={22} className="text-crimson-600" />
+              {uploading ? t("promo.studio.uploading") : photoUrl ? t("promo.studio.upload_another") : t("promo.studio.upload")}
+              <span className="text-xs font-normal text-ink-500">{t("promo.studio.upload_formats")}</span>
+            </button>
+            {uploads.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-ink-700">{t("promo.studio.your_uploads")}</p>
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                  {uploads.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPhotoUrl(p)}
+                      aria-pressed={photoUrl === p}
+                      className={cn("h-16 w-16 shrink-0 overflow-hidden rounded-lg border", focusRing, photoUrl === p ? "border-crimson-500 ring-2 ring-crimson-500/30" : "border-ink-200")}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p} alt="" className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {photoUrl && (
+              <div>
+                <p className="text-sm font-medium text-ink-700">{t("promo.studio.placement")}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Chip size="md" active={imageFit === "FIT"} onClick={() => setImageFit("FIT")}>
+                    {t("promo.studio.fit")}
+                  </Chip>
+                  <Chip size="md" active={imageFit === "FILL"} onClick={() => setImageFit("FILL")}>
+                    {t("promo.studio.fill")}
+                  </Chip>
+                </div>
+                <p className="mt-1.5 text-xs text-ink-500">{imageFit === "FIT" ? t("promo.studio.fit_hint") : t("promo.studio.fill_hint")}</p>
+              </div>
+            )}
+            {photoUrl && imageFit === "FIT" && (
+              <div>
+                <p className="text-sm font-medium text-ink-700">{t("promo.studio.backdrop")}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {swatches.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-label={c}
+                      aria-pressed={accent === c}
+                      onClick={() => setAccent(c)}
+                      className={cn("h-11 w-11 rounded-full border-2", focusRing, accent === c ? "border-ink-900 dark:border-white" : "border-transparent")}
+                      style={{ background: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="rounded-xl bg-ink-50 px-3 py-2.5 text-xs text-ink-600">{t("promo.studio.upload_rules")}</p>
+          </section>
+        )}
+
+        {kind && baseModel && !custom && (
           <section className="space-y-4">
             <h2 className="text-sm font-semibold text-ink-900">{t("promo.studio.edit")}</h2>
             <div>
@@ -491,7 +629,20 @@ export function DesignStudio({
                 >
                   <ImageOff size={18} />
                 </button>
-                {studio.photos.map((p) => (
+                {studio.uploadsEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => fileInput.current?.click()}
+                    disabled={uploading}
+                    aria-label={t("promo.studio.upload_photo")}
+                    title={t("promo.studio.upload_photo")}
+                    className={cn("flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-ink-300 text-[10px] font-semibold text-ink-600 hover:border-crimson-400 disabled:opacity-60", focusRing)}
+                  >
+                    <Upload size={16} />
+                    {uploading ? "…" : t("promo.studio.upload_short")}
+                  </button>
+                )}
+                {[...uploads, ...studio.photos.filter((p) => !uploads.includes(p))].map((p) => (
                   <button
                     key={p}
                     type="button"
@@ -504,7 +655,9 @@ export function DesignStudio({
                   </button>
                 ))}
               </div>
-              {studio.photos.length === 0 && <p className="mt-1 text-xs text-ink-500">{t("promo.studio.no_photos")}</p>}
+              {studio.photos.length === 0 && uploads.length === 0 && (
+                <p className="mt-1 text-xs text-ink-500">{studio.uploadsEnabled ? t("promo.studio.no_photos_upload") : t("promo.studio.no_photos")}</p>
+              )}
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-ink-100 px-3 text-sm">

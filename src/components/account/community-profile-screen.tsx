@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 import { Lock } from "lucide-react";
-import { userApi, uploadFileToPresignedUrl } from "@/lib/api";
+import { communityApi, userApi, uploadFileToPresignedUrl } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
 import { useLanguage } from "@/lib/language-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { Button } from "@/components/ui/button";
 import { PageSpinner } from "@/components/ui/misc";
+import type { CommunityGender } from "@/lib/types";
+import { cn, focusRing } from "@/lib/utils";
+import { CommunityGenderBadge } from "@/components/community-gender-badge";
+import { Switch } from "@/components/ui/switch";
 import { AvatarPicker } from "./avatar-picker";
 import { ScreenHeader } from "./screen-header";
 
@@ -81,13 +85,84 @@ export function CommunityProfileScreen() {
           ariaLabel="Change community avatar"
           uploading={uploading}
         />
-        <p className="mt-3 text-sm font-medium text-ink-900 dark:text-ink-100">u/{profile.communityUsername}</p>
+        <p className="mt-3 flex items-center justify-center gap-1 text-sm font-medium text-ink-900">
+          u/{profile.communityUsername}
+          <CommunityGenderBadge gender={profile.communityGenderVisible ? profile.communityGender : null} />
+        </p>
 
         <div className="mt-6 flex items-start gap-2.5 rounded-xl bg-ink-50 p-3 text-left text-sm text-ink-600 dark:bg-ink-800 dark:text-ink-300">
           <Lock size={16} className="mt-0.5 shrink-0" strokeWidth={1.75} />
           <p>{t("account.community_avatar.hint")}</p>
         </div>
+
+        <GenderSettings />
       </div>
     </div>
+  );
+}
+
+/** V59: change the M/F choice or hide the badge. Hidden = the gender is never sent to anyone else. */
+function GenderSettings() {
+  const { profile, setProfile } = useAuth();
+  const { t } = useLanguage();
+  const { show } = useToast();
+  const [busy, setBusy] = useState(false);
+  if (!profile?.communityUsername) return null;
+
+  async function save(body: { gender?: CommunityGender; visible?: boolean }) {
+    if (!profile || busy) return;
+    setBusy(true);
+    try {
+      const res = await communityApi.updateGender(body);
+      setProfile({ ...profile, communityGender: res.communityGender, communityGenderVisible: res.communityGenderVisible });
+      show(t("community.gender.saved"), "success");
+    } catch (err) {
+      show(errorMessage(err), "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="mt-6 text-left" aria-labelledby="community-gender-heading">
+      <h2 id="community-gender-heading" className="text-sm font-semibold text-ink-900">
+        {t("community.gender.label")}
+      </h2>
+      <div role="radiogroup" aria-labelledby="community-gender-heading" className="mt-2 grid grid-cols-2 gap-2">
+        {(["M", "F"] as const).map((g) => (
+          <button
+            key={g}
+            type="button"
+            role="radio"
+            aria-checked={profile.communityGender === g}
+            disabled={busy}
+            onClick={() => profile.communityGender !== g && save({ gender: g })}
+            className={cn(
+              "flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:opacity-60",
+              focusRing,
+              profile.communityGender === g
+                ? "border-crimson-500 bg-crimson-50 text-crimson-800 dark:bg-crimson-900/40 dark:text-crimson-200"
+                : "border-ink-200 text-ink-700 hover:bg-ink-50"
+            )}
+          >
+            <CommunityGenderBadge gender={g} />
+            {g === "M" ? t("community.gender.male") : t("community.gender.female")}
+          </button>
+        ))}
+      </div>
+      {profile.communityGender && (
+        <div className="mt-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-ink-800">{t("community.gender.show_badge")}</p>
+            <p className="mt-0.5 text-xs text-ink-500">{t("community.gender.show_badge_hint")}</p>
+          </div>
+          <Switch
+            checked={profile.communityGenderVisible}
+            onCheckedChange={(v: boolean) => save({ visible: v })}
+            aria-label={t("community.gender.show_badge")}
+          />
+        </div>
+      )}
+    </section>
   );
 }

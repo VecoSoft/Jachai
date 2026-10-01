@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { avatarColorClass, avatarInitials, cn, focusRing, timeAgo } from "@/lib/utils";
 import type { CommunityAreaSummary, CommunityAuthorSummary } from "@/lib/types";
 import { FollowControl } from "./community-follow-control";
+import { CommunityGenderBadge } from "./community-gender-badge";
 
 /**
  * Author identity row — Instagram/Facebook-style: avatar, then username + inline
@@ -44,7 +45,7 @@ export function PostHeader({
           J
         </div>
         <div className="min-w-0 flex-1 leading-tight">
-          <p className={cn("flex items-center gap-1 font-semibold text-ink-800 dark:text-ink-100", nameSize)}>
+          <p className={cn("flex items-center gap-1 font-semibold text-ink-800", nameSize)}>
             {author.communityUsername ?? "Jachai Team"}
             <BadgeCheck size={size === "md" ? 15 : 13} className="shrink-0 text-brand-600" aria-label="Official account" />
             <span className="rounded-full bg-brand-50 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-brand-700">
@@ -87,7 +88,7 @@ export function PostHeader({
               href={`/community/u/${author.communityUsername}`}
               onClick={(e) => e.stopPropagation()}
               className={cn(
-                "inline-flex min-w-0 items-center gap-0.5 truncate font-semibold text-ink-800 hover:underline dark:text-ink-100",
+                "inline-flex min-w-0 items-center gap-0.5 truncate font-semibold text-ink-800 hover:underline",
                 focusRing
               )}
             >
@@ -95,8 +96,9 @@ export function PostHeader({
               {author.verified && <BadgeCheck size={size === "md" ? 15 : 13} className="shrink-0 text-brand-600" aria-label="Verified member" />}
             </Link>
           ) : (
-            <span className="min-w-0 truncate font-semibold text-ink-800 dark:text-ink-100">{displayName}</span>
+            <span className="min-w-0 truncate font-semibold text-ink-800">{displayName}</span>
           )}
+          {author.communityUsername && <CommunityGenderBadge gender={author.gender} className="ml-1" />}
           {!isSelf && author.communityUsername && (
             <>
               <span aria-hidden className="mx-1 shrink-0 text-ink-400">

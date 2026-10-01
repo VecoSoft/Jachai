@@ -7,7 +7,7 @@ import { businessApi, communityApi, promoApi, uploadFileToPresignedUrl } from "@
 import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { useAuthModal } from "@/lib/auth-modal-context";
-import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
+import { needsCommunitySetup, useCommunityUsernameModal } from "@/lib/community-username-modal-context";
 import {
   COMMUNITY_COMPOSER_TYPES,
   COMMUNITY_POLL_DURATIONS,
@@ -187,8 +187,8 @@ export function CommunityComposer({ onPosted }: { onPosted: (post: CommunityPost
       openLogin();
       return;
     }
-    if (!profile?.communityUsername) {
-      // A business owner without a member username can still post as their business.
+    if (needsCommunitySetup(profile)) {
+      // A business owner without a finished member profile can still post as their business.
       if (myBusinesses.length > 0) {
         setPostAs(myBusinesses[0].id);
         setExpanded(true);

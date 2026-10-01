@@ -9,7 +9,7 @@ import { BusinessPostCard } from "@/components/promo/business-post-card";
 import { communityWriteBlock, topicLabel, useCommunitySettings, useCommunityStanding } from "@/lib/community-settings";
 import { useAuth } from "@/lib/auth-context";
 import { useAuthModal } from "@/lib/auth-modal-context";
-import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
+import { needsCommunitySetup, useCommunityUsernameModal } from "@/lib/community-username-modal-context";
 import { applyVoteDelta } from "@/lib/community-vote";
 import { COMMUNITY_POST_TYPE_META } from "@/lib/community-constants";
 import { errorMessage, useToast } from "@/lib/toast-context";
@@ -109,7 +109,7 @@ export default function CommunityPostDetailPage() {
       openLogin();
       return;
     }
-    if (!(replyAsBusiness && ownsPostBusiness) && !profile?.communityUsername) {
+    if (!(replyAsBusiness && ownsPostBusiness) && needsCommunitySetup(profile)) {
       openUsernameModal();
       return;
     }
@@ -122,7 +122,7 @@ export default function CommunityPostDetailPage() {
       return;
     }
     const asBusiness = replyAsBusiness && ownsPostBusiness && post.business ? post.business.id : null;
-    if (!asBusiness && !profile?.communityUsername) {
+    if (!asBusiness && needsCommunitySetup(profile)) {
       openUsernameModal();
       return;
     }
