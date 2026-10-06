@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { businessApi } from "@/lib/api";
+import { businessApi, homeApi } from "@/lib/api";
 import { rememberBusinesses } from "@/lib/business-cache";
 import { useHomeSearch } from "@/lib/home-search-context";
 import { useUserLocation } from "@/lib/location-context";
 import { useLanguage } from "@/lib/language-context";
 import { errorMessage } from "@/lib/toast-context";
-import type { Area, BusinessResponse, Category, SearchSuggestion, SmartSearchResponse } from "@/lib/types";
+import type { Area, BusinessResponse, Category, SearchSuggestion, SmartSearchResponse, HomepageContent } from "@/lib/types";
 import { BrandCard } from "@/components/brand-card";
 import { BusinessCard } from "@/components/business-card";
 import { BusinessCarousel } from "@/components/business-carousel";
@@ -81,6 +81,9 @@ export default function HomePage() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [trending, setTrending] = useState<BusinessResponse[]>([]);
   const [mostLoved, setMostLoved] = useState<BusinessResponse[]>([]);
+  // Admin-curated hero + featured categories (System → Homepage); null fields keep the built-in copy.
+  const [home, setHome] = useState<HomepageContent | null>(null);
+  const heroImages = home?.heroImageUrl ? [home.heroImageUrl] : HERO_IMAGES;
   const resultsRef = useRef<HTMLDivElement>(null);
   const heroTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -187,6 +190,10 @@ export default function HomePage() {
   // Sitewide, unfiltered by the search params above — a fixed top-10 snapshot
   // fetched once on mount, not re-fetched as the visitor changes filters.
   useEffect(() => {
+    homeApi
+      .get()
+      .then(setHome)
+      .catch(() => {});
     businessApi
       .search({ sort: "trending", size: 10 })
       .then((page) => setTrending(page.content))
@@ -232,7 +239,7 @@ export default function HomePage() {
             is stacked in the same spot; only the current one is opacity-100,
             and transition-opacity crossfades between them. animate-ken-burns
             restarts on each layer the moment it becomes the visible one. */}
-        {HERO_IMAGES.map((url, i) => (
+        {heroImages.map((url, i) => (
           <div
             key={url}
             // animate-ken-burns is unconditional (every layer, from mount) —
@@ -242,7 +249,7 @@ export default function HomePage() {
             // it fades in. Only opacity animates on rotation; the zoom runs
             // completely independently underneath it, so the fade is smooth.
             className={`absolute inset-0 bg-cover bg-center animate-ken-burns transition-opacity duration-[1500ms] ease-in-out ${
-              i === heroIndex ? "opacity-100" : "opacity-0"
+              i === heroIndex % heroImages.length ? "opacity-100" : "opacity-0"
             }`}
             style={{ backgroundImage: `url(${url})` }}
           />
@@ -297,15 +304,19 @@ export default function HomePage() {
             className="max-w-2xl font-sans text-2xl md:text-3xl lg:text-5xl font-extrabold text-white leading-[1.15] md:leading-[1.12] tracking-tight drop-shadow-sm animate-hero-in"
             style={{ animationDelay: "150ms" }}
           >
-            Find a business you can actually trust
+            {home?.heroTitle ?? "Find a business you can actually trust"}
           </h1>
           <p
             className="animate-hero-in mt-3 md:mt-10 text-white/90 text-sm md:text-base max-w-md leading-relaxed"
             style={{ animationDelay: "300ms" }}
           >
-            Search verified local businesses across Dhaka — filtered by category, area, price,
-            and rating, with owner verification you won&apos;t find on Google Maps or
-            Facebook.
+            {home?.heroSubtitle ?? (
+              <>
+                Search verified local businesses across Dhaka — filtered by category, area, price,
+                and rating, with owner verification you won&apos;t find on Google Maps or
+                Facebook.
+              </>
+            )}
           </p>
           <button
             type="button"
@@ -318,6 +329,27 @@ export default function HomePage() {
           </button>
         </div>
       </section>
+
+      {home && home.featuredCategories.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+          <h2 className="font-display text-lg font-semibold text-ink-900">Featured categories</h2>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {home.featuredCategories.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => {
+                  setParams({ ...params, categoryId: c.id, page: 0 });
+                  scrollToResults();
+                }}
+                className="rounded-full border border-ink-200 bg-surface px-4 py-2 text-sm font-medium text-ink-700 hover:border-crimson-300 hover:text-crimson-700"
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {(trending.length > 0 || mostLoved.length > 0) && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">

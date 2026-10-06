@@ -9,6 +9,7 @@ import { ProfileCompletenessCard } from "@/components/profile-completeness-card"
 import { BusinessPerformance } from "@/components/business-performance";
 import { ErrorBanner } from "@/components/ui/misc";
 import { PendingPhotosNotice } from "@/components/pending-photos-notice";
+import { ListingIntegrityCard } from "@/components/owner/listing-integrity-card";
 
 function MetricCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -63,6 +64,8 @@ export function OwnerOverviewPanel({ business }: { business: BusinessResponse })
         <MetricCard label="Gallery photos" value={galleryCount ?? "—"} />
         <MetricCard label="Completeness" value={completeness ? `${completeness.percentage}%` : "—"} />
       </div>
+
+      <ListingIntegrityCard business={business} />
 
       <PendingPhotosNotice businessId={business.id} />
 

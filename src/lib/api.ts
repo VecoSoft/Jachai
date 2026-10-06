@@ -22,6 +22,9 @@ import type {
   BusinessClaim,
   BusinessPhoto,
   MyModeratedPhoto,
+  HomepageContent,
+  PendingListingChange,
+  VerificationRequestView,
   BusinessReactionType,
   BusinessResponse,
   BusinessSearchParams,
@@ -893,6 +896,22 @@ export const messageApi = {
 // ---------------------------------------------------------------------------
 // Gallery
 // ---------------------------------------------------------------------------
+/** Curated homepage content (admin → System → Homepage). */
+export const homeApi = {
+  get: () => request<HomepageContent>("/api/v1/home", { auth: false }),
+};
+
+/** Listing integrity (owner side): the Verified badge request and protected edits awaiting approval. */
+export const listingApi = {
+  /** null when nothing is waiting (the API answers 204). */
+  pendingChange: (businessId: string) =>
+    request<PendingListingChange | undefined>(`/api/v1/businesses/${businessId}/pending-changes`).then((r) => r ?? null),
+  verificationHistory: (businessId: string) =>
+    request<VerificationRequestView[]>(`/api/v1/businesses/${businessId}/verification-requests`),
+  requestVerification: (businessId: string, body: { method: "PHONE" | "DOCUMENT"; note?: string; documentRef?: string }) =>
+    request<VerificationRequestView>(`/api/v1/businesses/${businessId}/verification-requests`, { method: "POST", body }),
+};
+
 /** Photo moderation — the caller's own pending/rejected uploads (any source). */
 export const photosApi = {
   mine: () => request<MyModeratedPhoto[]>("/api/v1/photos/mine"),

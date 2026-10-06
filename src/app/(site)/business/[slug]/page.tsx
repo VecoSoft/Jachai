@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Flag, MoreHorizontal, Share2 } from "lucide-react";
 import { businessApi, referenceApi, reviewApi } from "@/lib/api";
 import { rememberBusiness } from "@/lib/business-cache";
@@ -138,6 +138,7 @@ function BusinessHeaderMenu({ business }: { business: BusinessResponse }) {
 export default function BusinessDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user, profile, switchAccount } = useAuth();
+  const router = useRouter();
   // Admin feature flags: owner chat / ordering can be switched off platform-wide.
   const features = usePlatformFeatures();
   const { openLogin, openSignup } = useAuthModal();
@@ -259,6 +260,11 @@ export default function BusinessDetailPage() {
       .getBySlug(slug)
       .then((b) => {
         if (cancelled) return;
+        // A listing merged into another one answers with the kept listing (the API 301s) —
+        // move the address bar to its real slug so links and refreshes use it.
+        if (b.slug && b.slug !== slug) {
+          router.replace(`/business/${b.slug}`);
+        }
         setBusiness(b);
         rememberBusiness(b);
         trackProfileView(b.id); // deduped in lib/analytics — once per ~30min per tab

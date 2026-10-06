@@ -1125,6 +1125,33 @@ export interface MyModeratedPhoto {
   createdAt: string;
 }
 
+/** GET /api/v1/home — homepage content curated in the admin panel (System → Homepage). Nulls = built-in defaults. */
+export interface HomepageContent {
+  heroTitle: string | null;
+  heroSubtitle: string | null;
+  heroImageUrl: string | null;
+  featuredCategories: { id: string; name: string; kind: string | null }[];
+}
+
+/** Owner view of a protected edit (verified listing) waiting for admin approval. */
+export interface PendingListingChange {
+  id: string;
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  changedFields: string[];
+  createdAt: string;
+}
+
+export interface VerificationRequestView {
+  id: string;
+  method: "PHONE" | "DOCUMENT" | "MANUAL";
+  status: "PENDING" | "APPROVED" | "REJECTED" | "REVOKED";
+  note: string | null;
+  reason: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
 /** Effective platform feature flags, from GET /api/v1/community/settings → features. */
 export interface PlatformFeatures {
   nidVerificationEnabled: boolean;
