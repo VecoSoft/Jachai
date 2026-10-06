@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useAuthModal } from "@/lib/auth-modal-context";
+import { usePlatformFeatures } from "@/lib/community-settings";
 import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
 import { useHomeSearch } from "@/lib/home-search-context";
 import { useLanguage } from "@/lib/language-context";
@@ -102,7 +103,11 @@ export function Navbar() {
   const isHero = pathname === "/";
   const { params, setParams, locationStatus, useMyLocation } = useHomeSearch();
   const [scrolled, setScrolled] = useState(!isHero);
-  const inboxUnreadCount = useBusinessInboxUnreadCount();
+  // Admin feature flags — switched-off features drop out of the navigation.
+  const features = usePlatformFeatures();
+  // Maintenance mode: visitors get a bare header (logo + theme toggle) that makes no API calls.
+  const maintenanceLocked = features.maintenanceMode && user?.role !== "ADMIN";
+  const inboxUnreadCount = useBusinessInboxUnreadCount(features.ownerChatEnabled && !maintenanceLocked);
 
   // Consumer and Business are two separate accounts (see lib/auth-context.tsx's
   // switchAccount) — isBusinessAccount reads straight off the JWT-decoded role,
@@ -154,6 +159,17 @@ export function Navbar() {
     setMenuOpen(false);
   }, [pathname]);
 
+  if (maintenanceLocked) {
+    return (
+      <header className="fixed top-0 left-0 w-full z-50 border-b border-ink-100 bg-surface/90 backdrop-blur shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+          <Logo light={false} />
+          <ThemeToggle className="text-ink-600 hover:bg-ink-100" />
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header
       className={cn(
@@ -184,9 +200,11 @@ export function Navbar() {
         )}
 
         <nav className="hidden md:flex shrink-0 items-center gap-0.5 lg:gap-1 text-sm lg:text-base font-medium ml-auto">
-          <Link href="/community" className={linkClass}>
-            Community
-          </Link>
+          {features.communityEnabled && (
+            <Link href="/community" className={linkClass}>
+              Community
+            </Link>
+          )}
           {/* Once this account is linked, "Switch to X" replaces "For Business" —
               same plain nav-link treatment, no separate bordered button, so the
               nav reads exactly the same whether or not an account is linked. */}
@@ -262,16 +280,18 @@ export function Navbar() {
                           >
                             My Businesses
                           </AccountMenuLink>
-                          <AccountMenuLink
-                            href="/owner/inbox"
-                            active={pathname.startsWith("/owner/inbox")}
-                            onClick={() => setAccountMenuOpen(false)}
-                          >
-                            Inbox
-                            {inboxUnreadCount > 0 && (
-                              <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-crimson-600" aria-hidden />
-                            )}
-                          </AccountMenuLink>
+                          {features.ownerChatEnabled && (
+                            <AccountMenuLink
+                              href="/owner/inbox"
+                              active={pathname.startsWith("/owner/inbox")}
+                              onClick={() => setAccountMenuOpen(false)}
+                            >
+                              Inbox
+                              {inboxUnreadCount > 0 && (
+                                <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-crimson-600" aria-hidden />
+                              )}
+                            </AccountMenuLink>
+                          )}
                           {profile?.communityUsername ? (
                             <AccountMenuLink
                               href={`/community/u/${profile.communityUsername}`}
@@ -324,27 +344,33 @@ export function Navbar() {
                           >
                             My offers
                           </AccountMenuLink>
-                          <AccountMenuLink
-                            href="/orders"
-                            active={pathname.startsWith("/orders")}
-                            onClick={() => setAccountMenuOpen(false)}
-                          >
-                            My orders
-                          </AccountMenuLink>
-                          <AccountMenuLink
-                            href="/bookings"
-                            active={pathname.startsWith("/bookings")}
-                            onClick={() => setAccountMenuOpen(false)}
-                          >
-                            My bookings
-                          </AccountMenuLink>
-                          <AccountMenuLink
-                            href="/me/messages"
-                            active={pathname.startsWith("/me/messages")}
-                            onClick={() => setAccountMenuOpen(false)}
-                          >
-                            {t("nav.messages")}
-                          </AccountMenuLink>
+                          {features.orderingEnabled && (
+                            <AccountMenuLink
+                              href="/orders"
+                              active={pathname.startsWith("/orders")}
+                              onClick={() => setAccountMenuOpen(false)}
+                            >
+                              My orders
+                            </AccountMenuLink>
+                          )}
+                          {features.bookingsEnabled && (
+                            <AccountMenuLink
+                              href="/bookings"
+                              active={pathname.startsWith("/bookings")}
+                              onClick={() => setAccountMenuOpen(false)}
+                            >
+                              My bookings
+                            </AccountMenuLink>
+                          )}
+                          {features.ownerChatEnabled && (
+                            <AccountMenuLink
+                              href="/me/messages"
+                              active={pathname.startsWith("/me/messages")}
+                              onClick={() => setAccountMenuOpen(false)}
+                            >
+                              {t("nav.messages")}
+                            </AccountMenuLink>
+                          )}
                           {profile?.communityUsername ? (
                             <AccountMenuLink
                               href={`/community/u/${profile.communityUsername}`}
@@ -399,9 +425,11 @@ export function Navbar() {
           )}
         </div>
 
-        <Link href="/community" className={cn(linkClass, "md:hidden ml-auto text-sm font-medium")}>
-          Community
-        </Link>
+        {features.communityEnabled && (
+          <Link href="/community" className={cn(linkClass, "md:hidden ml-auto text-sm font-medium")}>
+            Community
+          </Link>
+        )}
 
         <button
           type="button"
@@ -432,14 +460,16 @@ export function Navbar() {
                   <Link href="/owner" className="px-3 py-2 rounded hover:bg-ink-100" onClick={() => setMenuOpen(false)}>
                     My Businesses
                   </Link>
-                  <Link
-                    href="/owner/inbox"
-                    className="px-3 py-2 rounded hover:bg-ink-100 flex items-center gap-2"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Inbox
-                    {inboxUnreadCount > 0 && <span className="h-2 w-2 rounded-full bg-crimson-600" aria-hidden />}
-                  </Link>
+                  {features.ownerChatEnabled && (
+                    <Link
+                      href="/owner/inbox"
+                      className="px-3 py-2 rounded hover:bg-ink-100 flex items-center gap-2"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Inbox
+                      {inboxUnreadCount > 0 && <span className="h-2 w-2 rounded-full bg-crimson-600" aria-hidden />}
+                    </Link>
+                  )}
                   {profile?.communityUsername ? (
                     <Link
                       href={`/community/u/${profile.communityUsername}`}
@@ -485,15 +515,21 @@ export function Navbar() {
                   <Link href="/me/offers" className="px-3 py-2 rounded hover:bg-ink-100" onClick={() => setMenuOpen(false)}>
                     My offers
                   </Link>
-                  <Link href="/orders" className="px-3 py-2 rounded hover:bg-ink-100" onClick={() => setMenuOpen(false)}>
-                    My orders
-                  </Link>
-                  <Link href="/bookings" className="px-3 py-2 rounded hover:bg-ink-100" onClick={() => setMenuOpen(false)}>
-                    My bookings
-                  </Link>
-                  <Link href="/me/messages" className="px-3 py-2 rounded hover:bg-ink-100" onClick={() => setMenuOpen(false)}>
-                    {t("nav.messages")}
-                  </Link>
+                  {features.orderingEnabled && (
+                    <Link href="/orders" className="px-3 py-2 rounded hover:bg-ink-100" onClick={() => setMenuOpen(false)}>
+                      My orders
+                    </Link>
+                  )}
+                  {features.bookingsEnabled && (
+                    <Link href="/bookings" className="px-3 py-2 rounded hover:bg-ink-100" onClick={() => setMenuOpen(false)}>
+                      My bookings
+                    </Link>
+                  )}
+                  {features.ownerChatEnabled && (
+                    <Link href="/me/messages" className="px-3 py-2 rounded hover:bg-ink-100" onClick={() => setMenuOpen(false)}>
+                      {t("nav.messages")}
+                    </Link>
+                  )}
                   {profile?.communityUsername ? (
                     <Link
                       href={`/community/u/${profile.communityUsername}`}

@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { referenceApi } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { useAuthModal } from "@/lib/auth-modal-context";
+import { usePlatformFeatures } from "@/lib/community-settings";
 import { useLanguage } from "@/lib/language-context";
 import { cn } from "@/lib/utils";
 import type { Category, City } from "@/lib/types";
@@ -14,11 +16,17 @@ export function SiteFooter() {
   const [cities, setCities] = useState<City[]>([]);
   const { lang, setLanguage } = useLanguage();
   const { openLogin } = useAuthModal();
+  const { user } = useAuth();
+  // Maintenance mode: no footer (its lists come from the API, which answers 503 to visitors).
+  const maintenanceLocked = usePlatformFeatures().maintenanceMode && user?.role !== "ADMIN";
 
   useEffect(() => {
+    if (maintenanceLocked) return;
     referenceApi.categories().then(setCategories).catch(() => {});
     referenceApi.cities().then(setCities).catch(() => {});
-  }, []);
+  }, [maintenanceLocked]);
+
+  if (maintenanceLocked) return null;
 
   return (
     <footer className="border-t border-ink-100 bg-sand-50/60 mt-16">

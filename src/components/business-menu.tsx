@@ -6,6 +6,7 @@ import type { MenuItem, PublicCommerceView } from "@/lib/types";
 import { addToCart, CartConflictError, setQuantity, startNewCart } from "@/lib/cart";
 import { useCart } from "@/lib/use-cart";
 import { formatTk } from "@/lib/commerce";
+import { usePlatformFeatures } from "@/lib/community-settings";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { cn } from "@/lib/utils";
 import { EmptyState, PageSpinner } from "./ui/misc";
@@ -193,6 +194,8 @@ export function BusinessMenu({
 }) {
   const { show } = useToast();
   const { cart } = useCart();
+  // Hooks must run before the early returns below (admin "Ordering" feature flag).
+  const orderingOn = usePlatformFeatures().orderingEnabled;
   const [items, setItems] = useState<MenuItem[] | null>(null);
   const [commerce, setCommerce] = useState<PublicCommerceView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -244,7 +247,7 @@ export function BusinessMenu({
   if (!items) return <PageSpinner />;
   if (items.length === 0) return <EmptyState title="No menu items yet" />;
 
-  const orderingLive = commerce?.mode === "DIRECT_ORDER" && commerce.orderingEnabled;
+  const orderingLive = orderingOn && commerce?.mode === "DIRECT_ORDER" && commerce.orderingEnabled;
   const paused = !!orderingLive && commerce?.acceptingOrders === false;
   const orderingActive = !!orderingLive && !paused;
   const orderableCount = orderingActive ? items.filter(isOrderable).length : 0;

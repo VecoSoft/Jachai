@@ -1105,6 +1105,37 @@ export interface BusinessPhoto {
   url: string;
   sortOrder: number;
   createdAt: string;
+  /** Only the listing's owner ever sees non-APPROVED photos (public reads return APPROVED only). */
+  moderationStatus?: PhotoModerationStatus;
+}
+
+export type PhotoModerationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+/** GET /api/v1/photos/mine — the caller's photos still waiting for review, plus recent rejections. */
+export interface MyModeratedPhoto {
+  id: string;
+  source: "BUSINESS_PHOTO" | "COVER" | "LOGO" | "MENU_ITEM" | "POST" | "REVIEW";
+  sourceId: string;
+  businessId: string | null;
+  url: string;
+  status: "PENDING" | "REJECTED";
+  /** "Waiting for review" / "Not approved". */
+  label: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+/** Effective platform feature flags, from GET /api/v1/community/settings → features. */
+export interface PlatformFeatures {
+  nidVerificationEnabled: boolean;
+  orderingEnabled: boolean;
+  bookingsEnabled: boolean;
+  communityEnabled: boolean;
+  promotionsEnabled: boolean;
+  ownerChatEnabled: boolean;
+  newSignupsEnabled: boolean;
+  maintenanceMode: boolean;
+  maintenanceMessage: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1664,7 +1695,8 @@ export interface CommunityPublicSettings {
   };
   allowedAreaIds: string[];
   rulesMarkdown: string;
-  features: { nidVerificationEnabled: boolean };
+  /** Platform feature flags (admin → System → Settings). A disabled feature's endpoints answer 404. */
+  features: PlatformFeatures;
   banner: { id: string; postId: string; text: string; scope: string; areaId: string | null; topic: string | null } | null;
 }
 

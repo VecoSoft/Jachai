@@ -35,6 +35,7 @@ import { BusinessFaq } from "@/components/business-faq";
 import { BusinessUpdates } from "@/components/business-updates";
 import { BusinessMenu } from "@/components/business-menu";
 import { CartBar } from "@/components/cart-bar";
+import { usePlatformFeatures } from "@/lib/community-settings";
 import { BusinessServiceShowcase } from "@/components/business-service-showcase";
 import { BusinessTeam } from "@/components/business-team";
 import { BusinessProducts } from "@/components/business-products";
@@ -137,6 +138,8 @@ function BusinessHeaderMenu({ business }: { business: BusinessResponse }) {
 export default function BusinessDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user, profile, switchAccount } = useAuth();
+  // Admin feature flags: owner chat / ordering can be switched off platform-wide.
+  const features = usePlatformFeatures();
   const { openLogin, openSignup } = useAuthModal();
   const { show } = useToast();
 
@@ -404,7 +407,7 @@ export default function BusinessDetailPage() {
               contactNumber={business.contactNumber}
               latitude={business.latitude}
               longitude={business.longitude}
-              onMessageClick={() => setMessageWidgetState("open")}
+              onMessageClick={features.ownerChatEnabled ? () => setMessageWidgetState("open") : undefined}
             />
           </div>
           <div className="mt-3">
@@ -710,9 +713,11 @@ export default function BusinessDetailPage() {
 
           {/* Desktop only — mobile reaches the same chat via the BusinessActions grid's
               Message tile above, no need for a second, redundant entry point. */}
-          <div className="hidden sm:block">
-            <BusinessMessageSidebarCard business={business} onOpen={() => setMessageWidgetState("open")} />
-          </div>
+          {features.ownerChatEnabled && (
+            <div className="hidden sm:block">
+              <BusinessMessageSidebarCard business={business} onOpen={() => setMessageWidgetState("open")} />
+            </div>
+          )}
 
           <div className="rounded-xl border border-ink-100/70 bg-surface p-4 shadow-card space-y-3">
             <a
@@ -757,18 +762,22 @@ export default function BusinessDetailPage() {
 
       {/* Hidden while the chat is open (full-screen on mobile, floating bottom-right on
           desktop) so it can't visually collide with either. */}
-      {messageWidgetState !== "open" && <CartBar businessId={business.id} businessSlug={business.slug} />}
+      {messageWidgetState !== "open" && features.orderingEnabled && (
+        <CartBar businessId={business.id} businessSlug={business.slug} />
+      )}
 
-      <BusinessMessageWidget
-        state={messageWidgetState}
-        onClose={() => setMessageWidgetState("closed")}
-        onMinimize={() => setMessageWidgetState("minimized")}
-        onMaximize={() => setMessageWidgetState("open")}
-        business={business}
-        currentUserId={user?.id}
-        isLoggedIn={!!user}
-        onLogin={openLogin}
-      />
+      {features.ownerChatEnabled && (
+        <BusinessMessageWidget
+          state={messageWidgetState}
+          onClose={() => setMessageWidgetState("closed")}
+          onMinimize={() => setMessageWidgetState("minimized")}
+          onMaximize={() => setMessageWidgetState("open")}
+          business={business}
+          currentUserId={user?.id}
+          isLoggedIn={!!user}
+          onLogin={openLogin}
+        />
+      )}
     </div>
   );
 }

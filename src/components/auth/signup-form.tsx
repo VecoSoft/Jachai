@@ -7,6 +7,7 @@ import { useLanguage } from "@/lib/language-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { isValidBdPhone, isValidPassword, normalizeBdPhone } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { usePlatformFeatures } from "@/lib/community-settings";
 import { FieldError, FieldHint, Input, Label } from "@/components/ui/field";
 
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -21,6 +22,7 @@ export function SignupForm({
   const { login } = useAuth();
   const { show } = useToast();
   const { t } = useLanguage();
+  const signupsOpen = usePlatformFeatures().newSignupsEnabled;
 
   const [step, setStep] = useState<"details" | "otp">("details");
   const [name, setName] = useState("");
@@ -101,6 +103,17 @@ export function SignupForm({
     } finally {
       setVerifying(false);
     }
+  }
+
+  if (!signupsOpen) {
+    return (
+      <div className="space-y-4 text-center">
+        <p className="text-sm text-ink-700">New sign-ups are paused right now. Please check back soon.</p>
+        <button type="button" onClick={onSwitchToLogin} className="text-sm font-medium text-crimson-700 hover:underline">
+          Already have an account? Log in
+        </button>
+      </div>
+    );
   }
 
   if (step === "otp") {

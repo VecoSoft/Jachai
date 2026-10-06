@@ -12,12 +12,13 @@ const POLL_INTERVAL_MS = 45_000;
  * the UI" convention as NotificationBell — since /threads/business-inbox 403s
  * for any account that isn't role BUSINESS_OWNER.
  */
-export function useBusinessInboxUnreadCount(): number {
+/** {@code enabled} false (owner chat switched off, maintenance mode) → no polling, always 0. */
+export function useBusinessInboxUnreadCount(enabled = true): number {
   const { user } = useAuth();
   const [count, setCount] = useState(0);
 
   const refresh = useCallback(() => {
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!enabled || !user || user.role !== "BUSINESS_OWNER") {
       setCount(0);
       return;
     }
@@ -25,7 +26,7 @@ export function useBusinessInboxUnreadCount(): number {
       .businessInbox()
       .then((threads) => setCount(threads.reduce((sum, t) => sum + t.unreadCount, 0)))
       .catch(() => setCount(0));
-  }, [user]);
+  }, [user, enabled]);
 
   useEffect(() => {
     refresh();

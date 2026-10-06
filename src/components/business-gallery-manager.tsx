@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { galleryApi, uploadFileToPresignedUrl } from "@/lib/api";
+import { galleryApi, photosApi, uploadFileToPresignedUrl } from "@/lib/api";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { cn } from "@/lib/utils";
 import type { BusinessPhoto } from "@/lib/types";
 import { Button } from "./ui/button";
 import { PageSpinner } from "./ui/misc";
+import { PrivateImage } from "./private-image";
 
 const MAX_PHOTOS = 10;
 
@@ -15,6 +16,10 @@ const MAX_PHOTOS = 10;
  * business form (edit mode) and on the owner dashboard's Gallery tab. Handles
  * multi-file upload via the existing pre-signed URL flow, multi-select delete,
  * and reorder (◀/▶ buttons — deliberately no drag-and-drop dependency).
+ *
+ * New photos are moderated: the owner sees every photo here with its status — "Waiting for
+ * review" (loaded with the owner's token, the public URL doesn't serve it yet) or "Rejected:
+ * <reason>" (from GET /api/v1/photos/mine) with a Remove button.
  */
 export function BusinessGalleryManager({
   businessId,
@@ -31,6 +36,9 @@ export function BusinessGalleryManager({
   const [reordering, setReordering] = useState(false);
   const [pending, setPending] = useState<{ file: File; previewUrl: string }[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  /** Rejected gallery photo URL → the moderator's reason. */
+  const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingRef = useRef(pending);
   pendingRef.current = pending;
@@ -42,9 +50,15 @@ export function BusinessGalleryManager({
 
   function load() {
     setLoading(true);
-    galleryApi
-      .list(businessId)
-      .then(applyPhotos)
+    Promise.all([galleryApi.list(businessId), photosApi.mine().catch(() => [])])
+      .then(([list, mine]) => {
+        applyPhotos(list);
+        const reasons: Record<string, string> = {};
+        for (const m of mine) {
+          if (m.source === "BUSINESS_PHOTO" && m.status === "REJECTED" && m.reason) reasons[m.url] = m.reason;
+        }
+        setRejectReasons(reasons);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }
@@ -88,11 +102,19 @@ export function BusinessGalleryManager({
       return;
     }
     setUploading(true);
+    let heldForReview = 0;
     try {
       for (const p of pending) {
         const presigned = await galleryApi.requestUploadUrl(businessId, p.file.name);
         await uploadFileToPresignedUrl(presigned.uploadUrl, p.file);
-        await galleryApi.confirm(businessId, presigned.cdnUrlAfterUpload);
+        const saved = await galleryApi.confirm(businessId, presigned.cdnUrlAfterUpload);
+        if (saved.moderationStatus === "PENDING") heldForReview++;
+      }
+      if (heldForReview > 0) {
+        show(
+          `${heldForReview} photo${heldForReview > 1 ? "s" : ""} uploaded — waiting for review before ${heldForReview > 1 ? "they appear" : "it appears"} on your page.`,
+          "success"
+        );
       }
       pending.forEach((p) => URL.revokeObjectURL(p.previewUrl));
       setPending([]);
@@ -150,7 +172,23 @@ export function BusinessGalleryManager({
     }
   }
 
+  async function removeRejected(photoId: string) {
+    setRemovingId(photoId);
+    try {
+      await galleryApi.remove(businessId, photoId);
+      load();
+    } catch (err) {
+      show(errorMessage(err), "error");
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
   if (loading) return <PageSpinner />;
+
+  const liveCount = photos.filter((p) => (p.moderationStatus ?? "APPROVED") === "APPROVED").length;
+  const waitingCount = photos.filter((p) => p.moderationStatus === "PENDING").length;
+  const rejectedCount = photos.filter((p) => p.moderationStatus === "REJECTED").length;
 
   return (
     <div>
@@ -173,7 +211,9 @@ export function BusinessGalleryManager({
         )}
       </div>
       <p className="text-xs text-ink-400 mt-1">
-        {photos.length}/{MAX_PHOTOS} photos
+        {liveCount}/{MAX_PHOTOS} live
+        {waitingCount > 0 && ` · ${waitingCount} waiting`}
+        {rejectedCount > 0 && ` · ${rejectedCount} rejected`}
         {photos.length > 1 && " · use ◀ ▶ to reorder — the first photo leads your gallery"}
       </p>
 
@@ -213,24 +253,52 @@ export function BusinessGalleryManager({
                 selected && "ring-2 ring-crimson-600"
               )}
             >
-              <button
-                type="button"
-                onClick={() => toggleSelected(p.id)}
-                aria-pressed={selected}
-                aria-label={selected ? "Deselect photo" : "Select photo"}
-                className="absolute inset-0"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.url} alt="" className="h-full w-full object-cover" />
-              </button>
-              <span
-                className={cn(
-                  "pointer-events-none absolute top-1 left-1 h-5 w-5 rounded border flex items-center justify-center text-[11px] font-bold",
-                  selected ? "bg-crimson-600 border-crimson-600 text-white" : "bg-white/85 border-ink-300 text-transparent"
-                )}
-              >
-                ✓
-              </span>
+              {p.moderationStatus === "REJECTED" ? (
+                // Rejected: the file is no longer served — show why, and let the owner remove it.
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-2 pb-8 text-center">
+                  <span className="rounded bg-rose-600/90 px-1.5 py-0.5 text-[10px] font-semibold text-white line-clamp-3">
+                    Rejected{rejectReasons[p.url] ? `: ${rejectReasons[p.url]}` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeRejected(p.id)}
+                    disabled={removingId === p.id}
+                    className="rounded border border-ink-300 bg-surface px-2 py-0.5 text-[11px] font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-50"
+                  >
+                    {removingId === p.id ? "Removing…" : "Remove"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => toggleSelected(p.id)}
+                  aria-pressed={selected}
+                  aria-label={selected ? "Deselect photo" : "Select photo"}
+                  className="absolute inset-0"
+                >
+                  {p.moderationStatus === "PENDING" ? (
+                    <PrivateImage src={p.url} className="h-full w-full object-cover opacity-80" />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.url} alt="" className="h-full w-full object-cover" />
+                  )}
+                </button>
+              )}
+              {p.moderationStatus === "PENDING" && (
+                <span className="pointer-events-none absolute top-1 right-1 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold text-white dark:bg-amber-400/90 dark:text-ink-900">
+                  Waiting for review
+                </span>
+              )}
+              {p.moderationStatus !== "REJECTED" && (
+                <span
+                  className={cn(
+                    "pointer-events-none absolute top-1 left-1 h-5 w-5 rounded border flex items-center justify-center text-[11px] font-bold",
+                    selected ? "bg-crimson-600 border-crimson-600 text-white" : "bg-white/85 border-ink-300 text-transparent"
+                  )}
+                >
+                  ✓
+                </span>
+              )}
               {photos.length > 1 && (
                 <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-scrim/55 px-1 py-0.5">
                   <button

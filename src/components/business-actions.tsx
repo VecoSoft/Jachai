@@ -28,7 +28,8 @@ export function BusinessActions({
   contactNumber: string;
   latitude: number;
   longitude: number;
-  onMessageClick: () => void;
+  /** Omitted when owner chat is switched off (admin feature flag) — the Message tile hides. */
+  onMessageClick?: () => void;
 }) {
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
 
@@ -57,12 +58,14 @@ export function BusinessActions({
         <span className="text-xs font-medium">Directions</span>
       </a>
 
-      <button type="button" onClick={onMessageClick} className={tileClass}>
-        <span className={iconCircleClass}>
-          <MessageCircle size={22} strokeWidth={1.75} />
-        </span>
-        <span className="text-xs font-medium">Message</span>
-      </button>
+      {onMessageClick && (
+        <button type="button" onClick={onMessageClick} className={tileClass}>
+          <span className={iconCircleClass}>
+            <MessageCircle size={22} strokeWidth={1.75} />
+          </span>
+          <span className="text-xs font-medium">Message</span>
+        </button>
+      )}
 
       <BookmarkButton businessId={businessId} tile />
     </div>

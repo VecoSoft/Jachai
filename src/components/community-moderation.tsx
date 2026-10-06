@@ -35,7 +35,8 @@ export function CommunityStatusBanner() {
 
   if (!settings) return null;
   const showBanner = Boolean(settings.banner && dismissedId !== settings.banner.id);
-  if (settings.communityEnabled && !settings.readOnly && !showBanner) return null;
+  // Community switched off → CommunityGate renders the single full-page state instead.
+  if (!settings.communityEnabled || (!settings.readOnly && !showBanner)) return null;
 
   function dismiss() {
     if (!bannerId) return;
@@ -49,13 +50,7 @@ export function CommunityStatusBanner() {
 
   return (
     <div className="space-y-2">
-      {!settings.communityEnabled && (
-        <div role="status" className="flex items-start gap-2.5 rounded-xl border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-gold-800">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          <p>{settings.maintenanceMessage}</p>
-        </div>
-      )}
-      {settings.communityEnabled && settings.readOnly && (
+      {settings.readOnly && (
         <div role="status" className="flex items-start gap-2.5 rounded-xl border border-ink-200 bg-ink-50 px-4 py-3 text-sm text-ink-700">
           <Lock size={16} className="mt-0.5 shrink-0" />
           <p>{settings.readOnlyMessage}</p>

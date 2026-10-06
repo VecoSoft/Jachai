@@ -7,6 +7,7 @@ import { errorMessage } from "@/lib/toast-context";
 import { EmptyState, PageSpinner } from "./ui/misc";
 import { Button } from "./ui/button";
 import { BookingModal } from "./booking-modal";
+import { usePlatformFeatures } from "@/lib/community-settings";
 
 /**
  * Public showcase for the ServiceOffering list — services (GENERAL/SALON/CLINIC),
@@ -30,6 +31,8 @@ export function BusinessServiceShowcase({
   section?: ServiceSection;
   heading: string;
 }) {
+  // Hooks must run before the early returns below (admin "Bookings" feature flag).
+  const bookingsOn = usePlatformFeatures().bookingsEnabled;
   const [items, setItems] = useState<ServiceOffering[] | null>(null);
   const [commerce, setCommerce] = useState<PublicCommerceView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +72,8 @@ export function BusinessServiceShowcase({
     );
   }
 
-  const bookingLive = commerce?.mode === "BOOKING" && commerce.bookingEnabled && commerce.acceptingOrders !== false;
+  const bookingLive =
+    bookingsOn && commerce?.mode === "BOOKING" && commerce.bookingEnabled && commerce.acceptingOrders !== false;
   const paused = commerce?.mode === "BOOKING" && commerce.bookingEnabled && commerce.acceptingOrders === false;
 
   return (

@@ -21,6 +21,8 @@ import { LeafletLocationPicker } from "@/components/leaflet-location-picker";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { ErrorBanner, PageSpinner } from "@/components/ui/misc";
+import { FeatureUnavailable } from "@/components/feature-unavailable";
+import { useCommunitySettings, usePlatformFeatures } from "@/lib/community-settings";
 
 export default function CheckoutPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -28,6 +30,9 @@ export default function CheckoutPage() {
   const { user, profile } = useAuth();
   const { openLogin } = useAuthModal();
   const { cart, count, subtotal } = useCart();
+  // Admin "Ordering" switch (System → Settings). Null settings = not loaded yet.
+  const settingsLoaded = useCommunitySettings() !== null;
+  const orderingOn = usePlatformFeatures().orderingEnabled;
 
   const [business, setBusiness] = useState<BusinessResponse | null>(null);
   const [commerce, setCommerce] = useState<PublicCommerceView | null>(null);
@@ -47,9 +52,14 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
 
+  // Ordering switched off: drop this business's cart — it can no longer be checked out.
+  useEffect(() => {
+    if (settingsLoaded && !orderingOn && cart && cart.businessSlug === slug) clearCart();
+  }, [settingsLoaded, orderingOn, cart, slug]);
+
   // ---- load business + commerce -------------------------------------------
   useEffect(() => {
-    if (!slug) return;
+    if (!slug || !orderingOn) return;
     let cancelled = false;
     businessApi
       .getBySlug(slug)
@@ -64,7 +74,7 @@ export default function CheckoutPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, orderingOn]);
 
   // Prefill contact from the profile once.
   useEffect(() => {
@@ -167,6 +177,9 @@ export default function CheckoutPage() {
   }
 
   // ---- render ----------------------------------------------------------
+  if (settingsLoaded && !orderingOn) {
+    return <FeatureUnavailable feature="ordering" backHref={`/business/${slug}`} backLabel="Back to the business" />;
+  }
   if (loadError) return <ErrorBanner message={loadError} />;
 
   if (!user) {

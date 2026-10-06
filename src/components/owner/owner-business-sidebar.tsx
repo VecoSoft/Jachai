@@ -8,7 +8,8 @@ import { canBook, canSellDirect } from "@/lib/commerce";
 import { useNewOrderCount } from "@/lib/use-new-order-count";
 import { useNewBookingCount } from "@/lib/use-new-booking-count";
 import { cn } from "@/lib/utils";
-import type { BusinessResponse } from "@/lib/types";
+import type { BusinessResponse, PlatformFeatures } from "@/lib/types";
+import { usePlatformFeatures } from "@/lib/community-settings";
 
 interface NavItem {
   label: string;
@@ -22,7 +23,8 @@ interface NavItem {
 function buildNavGroups(
   business: BusinessResponse,
   newOrderCount: number,
-  newBookingCount: number
+  newBookingCount: number,
+  features: PlatformFeatures
 ): { title: string; items: NavItem[] }[] {
   const base = `/owner/${business.id}`;
   const moduleItems: NavItem[] = modulesForKind(business.categoryKind).map((m) => ({
@@ -30,8 +32,9 @@ function buildNavGroups(
     href: `${base}/sections/${m.key}`,
   }));
 
-  const sells = canSellDirect(business.categoryKind);
-  const books = canBook(business.categoryKind);
+  // Platform feature flags (admin → System → Settings) remove switched-off sections.
+  const sells = features.orderingEnabled && canSellDirect(business.categoryKind);
+  const books = features.bookingsEnabled && canBook(business.categoryKind);
   const commerceItems: NavItem[] = [
     ...(sells
       ? [
@@ -48,15 +51,19 @@ function buildNavGroups(
       : []),
   ];
 
-  return [
+  const groups = [
     {
       title: "Manage",
       items: [
         { label: "Overview", href: base, match: base },
         { label: "Reviews", href: `${base}/reviews` },
         { label: "Rating trend", href: `${base}/insights` },
-        { label: "Messages", href: "/owner/inbox", external: true },
-        { label: "Quick replies", href: `${base}/quick-replies` },
+        ...(features.ownerChatEnabled
+          ? [
+              { label: "Messages", href: "/owner/inbox", external: true },
+              { label: "Quick replies", href: `${base}/quick-replies` },
+            ]
+          : []),
       ],
     },
     {
@@ -80,6 +87,7 @@ function buildNavGroups(
       ],
     },
   ];
+  return features.promotionsEnabled ? groups : groups.filter((g) => g.title !== "Promote");
 }
 
 /** Business switcher — current business + a dropdown of the rest, plus the "all
@@ -173,7 +181,8 @@ export function OwnerBusinessSidebar({
   const pathname = usePathname();
   const newOrderCount = useNewOrderCount(canSellDirect(business.categoryKind) ? business.id : null);
   const newBookingCount = useNewBookingCount(canBook(business.categoryKind) ? business.id : null);
-  const groups = buildNavGroups(business, newOrderCount, newBookingCount);
+  const features = usePlatformFeatures();
+  const groups = buildNavGroups(business, newOrderCount, newBookingCount, features);
 
   function isActive(item: NavItem) {
     if (item.external) return false;

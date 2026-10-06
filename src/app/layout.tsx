@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Sora, Inter, JetBrains_Mono, Noto_Sans_Bengali } from "next/font/google";
 import "./globals.css";
+import { MaintenanceGate } from "@/components/maintenance-gate";
 import { AuthProvider } from "@/lib/auth-context";
 import { AuthModalProvider } from "@/lib/auth-modal-context";
 import { CommunityUsernameModalProvider } from "@/lib/community-username-modal-context";
@@ -69,7 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <LocationProvider>
                       <HomeSearchProvider>
                         <Navbar />
-                        {children}
+                        <MaintenanceGate>{children}</MaintenanceGate>
                         <SiteFooter />
                         <AuthModal />
                         <CommunityUsernameModal />

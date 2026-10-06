@@ -202,23 +202,70 @@ export function BusinessHeroGallery({ business }: { business: BusinessResponse }
     );
   }
 
+  // No photos yet: a plain header on the page background instead of an empty dark hero.
+  if (photos.length === 0) {
+    return (
+      <header className="border-b border-ink-100 pb-5 pt-2">
+        <h1 className="font-display text-3xl font-extrabold leading-tight text-ink-900 break-words sm:text-4xl">
+          {business.name}
+        </h1>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          {business.reviewCount === 0 ? (
+            <span className="text-sm text-ink-500 sm:text-base">New · no reviews yet</span>
+          ) : (
+            <>
+              <RatingBoxes rating={business.averageRating} size="md" />
+              <span className="text-lg font-bold text-ink-900">{business.averageRating.toFixed(1)}</span>
+              <a href="#reviews" className="text-sm text-ink-500 hover:text-crimson-700 hover:underline sm:text-base">
+                ({formatReviewCount(business.reviewCount)} {business.reviewCount === 1 ? "review" : "reviews"})
+              </a>
+            </>
+          )}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-700 sm:text-base">
+          <span>{business.categoryName}</span>
+          <span aria-hidden className="text-ink-300">
+            ·
+          </span>
+          <span>{PRICE_TIER_LABELS[business.priceTier]}</span>
+          {openStatus && (
+            <>
+              <span aria-hidden className="text-ink-300">
+                ·
+              </span>
+              <span className={cn("font-semibold", openStatus.open ? "text-emerald-600 dark:text-emerald-400" : "text-ink-500")}>
+                {openStatus.open ? "Open now" : "Closed"}
+                {openStatus.changesAt && (
+                  <span className="font-normal">
+                    {openStatus.open ? ` until ${openStatus.changesAt}` : ` · opens ${openStatus.changesAt}`}
+                  </span>
+                )}
+              </span>
+            </>
+          )}
+          {business.verified && (
+            <>
+              <span aria-hidden className="text-ink-300">
+                ·
+              </span>
+              <VerifiedBadge />
+            </>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-ink-500 sm:text-base">
+          {business.areaName}, {business.cityName}
+          {distance && <> · {distance}</>}
+        </p>
+      </header>
+    );
+  }
+
   return (
     <div
       className="relative w-screen ml-[calc(50%-50vw)] mr-[calc(50%-50vw)] h-[420px] sm:h-[460px] md:h-[520px] lg:h-[580px] overflow-hidden bg-ink-900"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {photos.length === 0 && (
-        <div className="flex h-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-ink-900 to-ink-800 text-ink-400">
-          <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="3" y="5" width="18" height="14" rx="2" />
-            <circle cx="9" cy="11" r="2" />
-            <path d="m21 15-4.5-4.5a2 2 0 0 0-2.8 0L5 19" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <p className="font-display text-sm text-ink-300">Photos coming soon</p>
-        </div>
-      )}
-
       {/* Single swipeable cinematic photo — the only view below lg, and the
           fallback at any width when there's just one photo (a strip needs 2+). */}
       {photos.length > 0 && (

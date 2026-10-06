@@ -21,6 +21,7 @@ import type {
   BusinessAttribute,
   BusinessClaim,
   BusinessPhoto,
+  MyModeratedPhoto,
   BusinessReactionType,
   BusinessResponse,
   BusinessSearchParams,
@@ -892,6 +893,11 @@ export const messageApi = {
 // ---------------------------------------------------------------------------
 // Gallery
 // ---------------------------------------------------------------------------
+/** Photo moderation — the caller's own pending/rejected uploads (any source). */
+export const photosApi = {
+  mine: () => request<MyModeratedPhoto[]>("/api/v1/photos/mine"),
+};
+
 export const galleryApi = {
   requestUploadUrl: (businessId: string, filename: string) =>
     request<PreSignedUploadResponse>(`/api/v1/businesses/${businessId}/photos/upload-url`, {

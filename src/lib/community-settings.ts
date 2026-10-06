@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { communityApi } from "./api";
 import { useAuth } from "./auth-context";
 import { COMMUNITY_TOPIC_LABELS, COMMUNITY_TOPICS } from "./community-constants";
-import type { CommunityPostType, CommunityPublicSettings, CommunityStanding, CommunityTopicInfo } from "./types";
+import type {
+  CommunityPostType,
+  CommunityPublicSettings,
+  CommunityStanding,
+  CommunityTopicInfo,
+  PlatformFeatures,
+} from "./types";
 
 /**
  * Admin-managed community configuration from GET /api/v1/community/settings — topics, enabled
@@ -47,6 +53,28 @@ export function useCommunitySettings(): CommunityPublicSettings | null {
     };
   }, []);
   return settings;
+}
+
+/** Used until the settings load (and if they fail): everything on except NID and maintenance. */
+const DEFAULT_FEATURES: PlatformFeatures = {
+  nidVerificationEnabled: false,
+  orderingEnabled: true,
+  bookingsEnabled: true,
+  communityEnabled: true,
+  promotionsEnabled: true,
+  ownerChatEnabled: true,
+  newSignupsEnabled: true,
+  maintenanceMode: false,
+  maintenanceMessage: null,
+};
+
+/**
+ * Platform feature flags (admin → System → Settings). Switched-off features hide their UI; the
+ * server answers 404 on their endpoints anyway, so this is UX only.
+ */
+export function usePlatformFeatures(): PlatformFeatures {
+  const settings = useCommunitySettings();
+  return settings?.features ? { ...DEFAULT_FEATURES, ...settings.features } : DEFAULT_FEATURES;
 }
 
 /** Whether NID verification is on (admin feature flag). Off by default — every NID entry point hides. */
