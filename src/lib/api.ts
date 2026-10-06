@@ -248,7 +248,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (!res.ok) {
     const message =
-      (payload as ApiError | null)?.message || res.statusText || "Request failed";
+      (payload as ApiError | null)?.message ||
+      res.statusText ||
+      (res.status === 401 || res.status === 403
+        ? "Your session has expired or you don't have access — please log in again."
+        : `Request failed (${res.status})`);
     throw new ApiClientError(res.status, message, payload as ApiError | null);
   }
 
@@ -910,6 +914,8 @@ export const listingApi = {
     request<VerificationRequestView[]>(`/api/v1/businesses/${businessId}/verification-requests`),
   requestVerification: (businessId: string, body: { method: "PHONE" | "DOCUMENT"; note?: string; documentRef?: string }) =>
     request<VerificationRequestView>(`/api/v1/businesses/${businessId}/verification-requests`, { method: "POST", body }),
+  cancelVerification: (businessId: string, requestId: string) =>
+    request<VerificationRequestView>(`/api/v1/businesses/${businessId}/verification-requests/${requestId}`, { method: "DELETE" }),
 };
 
 /** Photo moderation — the caller's own pending/rejected uploads (any source). */

@@ -1145,7 +1145,7 @@ export interface PendingListingChange {
 export interface VerificationRequestView {
   id: string;
   method: "PHONE" | "DOCUMENT" | "MANUAL";
-  status: "PENDING" | "APPROVED" | "REJECTED" | "REVOKED";
+  status: "PENDING" | "APPROVED" | "REJECTED" | "REVOKED" | "CANCELLED";
   note: string | null;
   reason: string | null;
   createdAt: string;

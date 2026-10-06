@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "i18n:check": "node scripts/check-i18n-parity.mjs"
+    "i18n:check": "node scripts/check-i18n-parity.mjs",
+    "e2e:verification-card": "node scripts/e2e-verification-card.mjs"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
