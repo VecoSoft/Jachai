@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { formatDateTime } from "@/lib/utils";
 import type { SupportTicketSummary } from "@/lib/types";
 import { ContentPageView } from "@/components/content-page-view";
+import { HelpSearch } from "@/components/help-search";
 import { Badge } from "@/components/ui/misc";
 import { buttonVariantClasses } from "@/components/ui/button";
 import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS, supportStatusTone } from "@/lib/support";
@@ -46,7 +47,7 @@ function MyRequests() {
 export default function HelpPage() {
   const { user } = useAuth();
   return (
-    <ContentPageView slug="help">
+    <ContentPageView slug="help" before={<HelpSearch />}>
       <div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-ink-100 bg-surface p-4">
         <LifeBuoy size={20} className="text-crimson-600" aria-hidden />
         <p className="flex-1 text-sm text-ink-700">Still stuck? Send us a message — we reply right here in the app.</p>

@@ -10,6 +10,13 @@ import { useLanguage } from "@/lib/language-context";
 import { cn } from "@/lib/utils";
 import type { Category, City } from "@/lib/types";
 
+const FOOTER_LINKS = [
+  { href: "/help", en: "Help", bn: "সাহায্য" },
+  { href: "/faq", en: "FAQ", bn: "প্রশ্নোত্তর" },
+  { href: "/terms", en: "Terms", bn: "শর্তাবলী" },
+  { href: "/privacy", en: "Privacy", bn: "গোপনীয়তা" },
+];
+
 /** Global site footer — categories/cities are the real reference-data lists, not hardcoded copy. */
 export function SiteFooter() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -80,6 +87,20 @@ export function SiteFooter() {
           <p className="text-ink-500 leading-relaxed mb-4">
             Bangladesh&apos;s trust-first local business directory — verified owners, real reviews.
           </p>
+          <nav aria-label="Help and policies" className="mb-4 flex flex-wrap items-center gap-x-1.5 text-ink-500">
+            {FOOTER_LINKS.map((l, i) => (
+              <span key={l.href} className="flex items-center gap-1.5">
+                {i > 0 && (
+                  <span aria-hidden className="text-ink-300">
+                    ·
+                  </span>
+                )}
+                <Link href={l.href} className="hover:text-crimson-700">
+                  {lang === "bn" ? l.bn : l.en}
+                </Link>
+              </span>
+            ))}
+          </nav>
           <h4 className="font-display font-bold text-ink-900 mb-2 text-xs uppercase tracking-wide">Language</h4>
           <div className="flex gap-2">
             <button

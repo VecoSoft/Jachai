@@ -10,7 +10,16 @@ import { cn } from "@/lib/utils";
  * schemes (e.g. javascript:) by default. Never pass rehype-raw here — doing
  * so would reopen stored-XSS on every post/comment body in the app.
  */
-export function CommunityMarkdown({ children, className }: { children: string; className?: string }) {
+export function CommunityMarkdown({
+  children,
+  className,
+  headingId,
+}: {
+  children: string;
+  className?: string;
+  /** Optional anchor id for ## headings (e.g. FAQ topics that other pages link to). */
+  headingId?: (text: string) => string | undefined;
+}) {
   return (
     <div className={cn("prose-community", className)}>
       <ReactMarkdown
@@ -29,7 +38,14 @@ export function CommunityMarkdown({ children, className }: { children: string; c
             <blockquote className="my-1.5 border-l-2 border-ink-200 pl-3 text-ink-600 italic">{bq}</blockquote>
           ),
           h1: ({ children: h }) => <h1 className="mt-3 mb-1.5 font-display text-lg font-bold text-ink-900">{h}</h1>,
-          h2: ({ children: h }) => <h2 className="mt-3 mb-1.5 font-display text-base font-bold text-ink-900">{h}</h2>,
+          h2: ({ children: h }) => (
+            <h2
+              id={headingId?.(String(h))}
+              className="mt-3 mb-1.5 scroll-mt-28 font-display text-base font-bold text-ink-900"
+            >
+              {h}
+            </h2>
+          ),
           h3: ({ children: h }) => <h3 className="mt-2 mb-1 font-display text-sm font-bold text-ink-900">{h}</h3>,
           code: ({ className: codeClassName, children: code }) => (
             <code className={cn("rounded bg-ink-100 px-1 py-0.5 font-mono text-[0.85em] text-ink-800", codeClassName)}>
