@@ -1,21 +1,12 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { BadgeCheck, Hourglass } from "lucide-react";
+import { BadgeCheck } from "lucide-react";
 import { claimApi, listingApi, uploadFileToPresignedUrl } from "@/lib/api";
 import { errorMessage, useToast } from "@/lib/toast-context";
-import type { BusinessResponse, PendingListingChange, VerificationRequestView } from "@/lib/types";
+import type { BusinessResponse, VerificationRequestView } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-
-const FIELD_LABELS: Record<string, string> = {
-  name: "Name",
-  contactNumber: "Phone",
-  categoryId: "Category",
-  cityId: "City",
-  areaId: "Area",
-  latitude: "Map pin",
-  longitude: "Map pin",
-};
+import { PendingChangeBanner } from "@/components/owner/pending-change-banner";
 
 const METHOD_LABELS: Record<VerificationRequestView["method"], string> = {
   PHONE: "Phone call",
@@ -38,7 +29,6 @@ function formatDate(iso: string): string {
  */
 export function ListingIntegrityCard({ business }: { business: BusinessResponse }) {
   const { show } = useToast();
-  const [pending, setPending] = useState<PendingListingChange | null>(null);
   const [history, setHistory] = useState<VerificationRequestView[]>([]);
   const [method, setMethod] = useState<"PHONE" | "DOCUMENT">("PHONE");
   const [note, setNote] = useState("");
@@ -48,7 +38,6 @@ export function ListingIntegrityCard({ business }: { business: BusinessResponse 
   const [error, setError] = useState<string | null>(null);
 
   function load() {
-    listingApi.pendingChange(business.id).then(setPending).catch(() => setPending(null));
     listingApi.verificationHistory(business.id).then(setHistory).catch(() => setHistory([]));
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,8 +95,6 @@ export function ListingIntegrityCard({ business }: { business: BusinessResponse 
     }
   }
 
-  const changedLabels = pending ? Array.from(new Set(pending.changedFields.map((f) => FIELD_LABELS[f] ?? f))) : [];
-
   return (
     <div className="rounded-xl border border-ink-100 bg-surface p-4 space-y-3" data-testid="listing-integrity-card">
       <div className="flex items-center gap-2">
@@ -115,15 +102,7 @@ export function ListingIntegrityCard({ business }: { business: BusinessResponse 
         <p className="text-sm font-semibold text-ink-900">{business.verified ? "Verified listing" : "Not verified yet"}</p>
       </div>
 
-      {pending && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-ink-700">
-          <Hourglass size={16} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-          <p>
-            Your change to <strong>{changedLabels.join(", ")}</strong> is waiting for review. Because this listing is
-            verified, the public page keeps the current {changedLabels.length > 1 ? "values" : "value"} until it&apos;s approved.
-          </p>
-        </div>
-      )}
+      <PendingChangeBanner businessId={business.id} />
 
       {!business.verified && waiting && (
         <p className="text-sm text-ink-700" data-testid="verification-requested">

@@ -118,6 +118,13 @@ function NotificationsContent() {
                 </Link>
               );
             }
+            if (n.relatedEntityType === "SUPPORT_TICKET" && n.relatedEntityId) {
+              return (
+                <Link key={n.id} href={`/help/support/${n.relatedEntityId}`} onClick={() => markRead(n)} className={rowClass}>
+                  {inner}
+                </Link>
+              );
+            }
             if (n.relatedEntityType === "BOOKING" && n.relatedEntityId) {
               return (
                 <Link key={n.id} href={`/bookings/${n.relatedEntityId}`} onClick={() => markRead(n)} className={rowClass}>

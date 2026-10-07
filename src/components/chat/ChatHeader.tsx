@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, BadgeCheck, Minus, MoreHorizontal, Store, X } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Flag, Minus, MoreHorizontal, Store, X } from "lucide-react";
 import { cn, focusRing, interactiveTransition } from "@/lib/utils";
 import { IconButton } from "@/components/ui/icon-button";
 import { initials } from "./chat-utils";
@@ -22,6 +22,7 @@ export function ChatHeader({
   onClose,
   onMinimize,
   onViewBusiness,
+  onReport,
 }: {
   name: string;
   avatarUrl?: string | null;
@@ -31,6 +32,8 @@ export function ChatHeader({
   onClose?: () => void;
   onMinimize?: () => void;
   onViewBusiness?: () => void;
+  /** Adds "Report conversation" to the ⋯ menu. */
+  onReport?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -89,7 +92,7 @@ export function ChatHeader({
         </IconButton>
       )}
 
-      {onViewBusiness && (
+      {(onViewBusiness || onReport) && (
         <div ref={menuRef} className="relative shrink-0">
           <IconButton
             variant="ghost"
@@ -108,6 +111,7 @@ export function ChatHeader({
               menuOpen ? "block animate-scale-in" : "hidden"
             )}
           >
+            {onViewBusiness && (
             <button
               type="button"
               role="menuitem"
@@ -124,6 +128,25 @@ export function ChatHeader({
               <Store size={15} />
               View business
             </button>
+            )}
+            {onReport && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onReport();
+                }}
+                className={cn(
+                  "flex min-h-11 w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-rose-600 hover:bg-rose-500/10",
+                  interactiveTransition,
+                  focusRing
+                )}
+              >
+                <Flag size={15} />
+                Report conversation
+              </button>
+            )}
           </div>
         </div>
       )}

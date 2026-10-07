@@ -320,6 +320,13 @@ export function Navbar() {
                           >
                             {t("nav.account_settings")}
                           </AccountMenuLink>
+                          <AccountMenuLink
+                            href="/help"
+                            active={pathname?.startsWith("/help") ?? false}
+                            onClick={() => setAccountMenuOpen(false)}
+                          >
+                            Help &amp; support
+                          </AccountMenuLink>
                         </>
                       ) : (
                         <>
@@ -398,6 +405,13 @@ export function Navbar() {
                             onClick={() => setAccountMenuOpen(false)}
                           >
                             {t("nav.account_settings")}
+                          </AccountMenuLink>
+                          <AccountMenuLink
+                            href="/help"
+                            active={pathname?.startsWith("/help") ?? false}
+                            onClick={() => setAccountMenuOpen(false)}
+                          >
+                            Help &amp; support
                           </AccountMenuLink>
                         </>
                       )}

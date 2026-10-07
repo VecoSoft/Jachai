@@ -1884,3 +1884,51 @@ export interface CreateOfferBody {
 
 /** Same field set as CreateOfferBody minus businessId, which never changes after creation. */
 export type UpdateOfferBody = Omit<CreateOfferBody, "businessId">;
+
+// ---------------------------------------------------------------------------
+// V67: support inbox, chat reports, content pages
+// ---------------------------------------------------------------------------
+export type SupportCategory = "ACCOUNT" | "ORDER" | "BOOKING" | "LISTING" | "PAYMENT" | "OTHER";
+export type SupportStatus = "OPEN" | "PENDING" | "RESOLVED";
+
+export interface SupportTicketSummary {
+  id: string;
+  category: SupportCategory;
+  subject: string;
+  status: SupportStatus;
+  created_at: string;
+  updated_at: string;
+  staff_replies: number;
+}
+
+export interface SupportTicketMessage {
+  id: string;
+  from_staff: boolean;
+  body: string;
+  created_at: string;
+}
+
+export interface SupportTicketDetail {
+  id: string;
+  category: SupportCategory;
+  subject: string;
+  status: SupportStatus;
+  screenshot_url: string | null;
+  created_at: string;
+  updated_at: string;
+  messages: SupportTicketMessage[];
+}
+
+export type ChatReportReason = "SPAM" | "HARASSMENT" | "SCAM" | "INAPPROPRIATE" | "OTHER";
+
+export type ContentSlug = "terms" | "privacy" | "faq" | "help";
+
+export interface ContentPage {
+  slug: ContentSlug;
+  locale: "en" | "bn";
+  title: string;
+  bodyMd: string;
+  version: number;
+  updatedAt: string | null;
+  builtIn: boolean;
+}

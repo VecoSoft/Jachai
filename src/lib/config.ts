@@ -75,4 +75,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   OFFER_REDEEMED: "Offer redeemed",
   OFFER_APPROVED: "Offer approved",
   OFFER_REJECTED: "Offer rejected",
+  ADMIN_NOTICE: "From Jachai",
+  BROADCAST: "Announcement",
+  SUPPORT_REPLY: "Support reply",
 };

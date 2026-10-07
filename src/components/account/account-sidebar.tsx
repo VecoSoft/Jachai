@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bookmark, LogOut, Receipt, SlidersHorizontal, Smile, Star, Store, Tag, User, type LucideIcon } from "lucide-react";
+import { Bookmark, LifeBuoy, LogOut, Receipt, SlidersHorizontal, Smile, Star, Store, Tag, User, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { cn, focusRing, interactiveTransition } from "@/lib/utils";
@@ -26,6 +26,8 @@ const ACTIVITY_ITEMS: NavItem[] = [
   { href: "/orders", label: "Orders & bookings", icon: Receipt },
   { href: "/me/offers", label: "My offers", icon: Tag },
 ];
+
+const HELP_ITEMS: NavItem[] = [{ href: "/help", label: "Help & support", icon: LifeBuoy }];
 
 const itemClass = (active: boolean) =>
   cn(
@@ -100,6 +102,8 @@ export function AccountSidebar() {
         <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">Activity</p>
         {renderGroup(ACTIVITY_ITEMS)}
       </div>
+
+      <div className="border-t border-ink-100 pt-4 dark:border-ink-800">{renderGroup(HELP_ITEMS)}</div>
 
       <div className="border-t border-ink-100 pt-4 dark:border-ink-800">
         <button

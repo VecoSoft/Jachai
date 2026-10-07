@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Lock } from "lucide-react";
-import { autoReplyApi } from "@/lib/api";
+import { Ban, Lock } from "lucide-react";
+import { autoReplyApi, messageApi } from "@/lib/api";
 import { useLanguage } from "@/lib/language-context";
 import type { AutoReply } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { MessageList } from "./MessageList";
 import { QuickReplies } from "./QuickReplies";
 import { Composer } from "./Composer";
 import { useMessageThread } from "./use-message-thread";
+import { ReportConversationModal } from "./ReportConversationModal";
 
 export function ChatPane({
   threadId,
@@ -51,12 +52,33 @@ export function ChatPane({
   const [draft, setDraft] = useState("");
   const { lang } = useLanguage();
   const [autoReplies, setAutoReplies] = useState<AutoReply[]>([]);
-  const { messages, loading, error, send, sendQuickReply, react, retryLast, lastMessageStatus } = useMessageThread({
+  const [reportOpen, setReportOpen] = useState(false);
+  const [blockedUntil, setBlockedUntil] = useState<string | null>(null);
+  const {
+    threadId: activeThreadId,
+    messages,
+    loading,
+    error,
+    send,
+    sendQuickReply,
+    react,
+    retryLast,
+    lastMessageStatus,
+  } = useMessageThread({
     threadId,
     businessId,
     currentUserId,
     enabled: enabled && isLoggedIn && !isOwnBusiness,
   });
+
+  // A messaging block (after a reported conversation was reviewed) — say so instead of failing sends.
+  useEffect(() => {
+    if (!enabled || !isLoggedIn || isOwnBusiness) return;
+    messageApi
+      .canSend()
+      .then((r) => setBlockedUntil(r.canSend ? null : r.blockedUntil))
+      .catch(() => {});
+  }, [enabled, isLoggedIn, isOwnBusiness]);
 
   useEffect(() => {
     if (!showQuickReplies || !businessId || !isLoggedIn || isOwnBusiness) return;
@@ -93,7 +115,16 @@ export function ChatPane({
         onClose={onClose}
         onMinimize={onMinimize}
         onViewBusiness={onViewBusiness}
+        onReport={activeThreadId && isLoggedIn && !isOwnBusiness ? () => setReportOpen(true) : undefined}
       />
+      {activeThreadId && (
+        <ReportConversationModal
+          threadId={activeThreadId}
+          otherPartyName={otherPartyName}
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
 
       {!isLoggedIn ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
@@ -131,12 +162,20 @@ export function ChatPane({
             </p>
           )}
 
+          {blockedUntil ? (
+            <p className="flex items-start gap-1.5 border-t border-ink-100 px-4 py-3 text-xs text-rose-600 dark:border-ink-700">
+              <Ban size={14} className="mt-0.5 shrink-0" />
+              You can&apos;t send messages until {new Date(blockedUntil).toLocaleString()} — a conversation you were in was
+              reported and reviewed. Check your notifications for details.
+            </p>
+          ) : (
           <Composer
             value={draft}
             onChange={setDraft}
             onSend={() => handleSend(draft)}
             placeholder={`Message ${otherPartyName}…`}
           />
+          )}
         </>
       )}
     </div>

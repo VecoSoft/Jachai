@@ -138,6 +138,12 @@ import type {
   SponsoredBusiness,
   StudioData,
   BusinessPostType,
+  ChatReportReason,
+  ContentPage,
+  ContentSlug,
+  SupportCategory,
+  SupportTicketDetail,
+  SupportTicketSummary,
 } from "./types";
 import { attributionQuery, promoSessionHeaders } from "./promo-session";
 
@@ -895,6 +901,39 @@ export const messageApi = {
   myThreads: () => request<MessageThread[]>("/api/v1/messages/threads/mine"),
 
   businessInbox: () => request<MessageThread[]>("/api/v1/messages/threads/business-inbox"),
+
+  /** Report a conversation (chat ⋯ menu). Only reported conversations ever reach Jachai's moderators. */
+  reportThread: (threadId: string, reason: ChatReportReason, details?: string) =>
+    request<{ id: string; status: string }>(`/api/v1/messages/threads/${threadId}/report`, {
+      method: "POST",
+      body: { reason, details },
+    }),
+
+  /** False while a messaging block (after a reported conversation) is active. */
+  canSend: () => request<{ canSend: boolean; blockedUntil: string | null }>("/api/v1/messages/can-send"),
+};
+
+// ---------------------------------------------------------------------------
+// Help → Contact support (V67)
+// ---------------------------------------------------------------------------
+export const supportApi = {
+  /** Screenshot upload — stored privately (only you and Jachai staff can open it). */
+  requestUploadUrl: (filename: string) =>
+    request<PreSignedUploadResponse>("/api/v1/support/tickets/upload-url", { method: "POST", query: { filename } }),
+  open: (body: { category: SupportCategory; subject: string; message: string; screenshotUrl?: string }) =>
+    request<SupportTicketDetail>("/api/v1/support/tickets", { method: "POST", body }),
+  mine: () => request<SupportTicketSummary[]>("/api/v1/support/tickets"),
+  get: (id: string) => request<SupportTicketDetail>(`/api/v1/support/tickets/${id}`),
+  reply: (id: string, message: string) =>
+    request<SupportTicketDetail>(`/api/v1/support/tickets/${id}/messages`, { method: "POST", body: { message } }),
+};
+
+// ---------------------------------------------------------------------------
+// Content pages — Terms, Privacy, FAQ, Help (V67)
+// ---------------------------------------------------------------------------
+export const contentApi = {
+  get: (slug: ContentSlug, lang: "en" | "bn") =>
+    request<ContentPage>(`/api/v1/content/${slug}`, { query: { lang }, auth: false }),
 };
 
 // ---------------------------------------------------------------------------
@@ -916,6 +955,9 @@ export const listingApi = {
     request<VerificationRequestView>(`/api/v1/businesses/${businessId}/verification-requests`, { method: "POST", body }),
   cancelVerification: (businessId: string, requestId: string) =>
     request<VerificationRequestView>(`/api/v1/businesses/${businessId}/verification-requests/${requestId}`, { method: "DELETE" }),
+  /** The owner withdraws a protected edit that is still waiting for review. */
+  cancelPendingChange: (businessId: string, changeId: string) =>
+    request<void>(`/api/v1/businesses/${businessId}/pending-changes/${changeId}`, { method: "DELETE" }),
 };
 
 /** Photo moderation — the caller's own pending/rejected uploads (any source). */

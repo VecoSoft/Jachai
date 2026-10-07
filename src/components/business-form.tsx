@@ -6,6 +6,7 @@ import {
   businessApi,
   catalogApi,
   galleryApi,
+  listingApi,
   referenceApi,
   uploadFileToPresignedUrl,
 } from "@/lib/api";
@@ -24,6 +25,7 @@ import type {
 } from "@/lib/types";
 import { modulesForKind } from "@/lib/category-modules";
 import { Button } from "./ui/button";
+import { PendingChangeBanner, changedLabels } from "./owner/pending-change-banner";
 import { BusinessFaqManager } from "./business-faq-manager";
 import { BusinessGalleryManager } from "./business-gallery-manager";
 import { CategoryModulesManager } from "./category-modules/category-modules-manager";
@@ -715,7 +717,17 @@ export function BusinessForm({ existing, initialValues }: Props) {
           }
         }
 
-        show(t("business_form.toast.updated"), "success");
+        // V65 protected edits: on a verified listing a new name / phone / address / category
+        // waits for approval — say so instead of a plain "saved".
+        const held = existing.verified ? await listingApi.pendingChange(existing.id).catch(() => null) : null;
+        if (held) {
+          show(
+            `Saved. ${changedLabels(held).join(", ")} sent for review — your page keeps the current values until approved.`,
+            "info"
+          );
+        } else {
+          show(t("business_form.toast.updated"), "success");
+        }
 
         router.push(`/business/${updated.slug}`);
 
@@ -815,6 +827,11 @@ export function BusinessForm({ existing, initialValues }: Props) {
 
   return (
     <div className="max-w-5xl mx-auto px-4">
+      {existing && (
+        <div className="mb-5 empty:hidden">
+          <PendingChangeBanner businessId={existing.id} />
+        </div>
+      )}
       {error && (
         <div className="mb-5">
           <ErrorBanner message={error} />
