@@ -52,5 +52,5 @@ export async function renderCreativePng(
 
 /** Backend base URL for server-side fetches (same env var as the browser client). */
 export function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:8085";
+  return (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL)?.replace(/\/$/, "") || "http://localhost:8085";
 }

@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // 301 to the kept listing, so search engines and shared links move over. The lookup is a tiny
 // public API call, cached per server instance for a few minutes (hits and misses alike).
 
-const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8085").replace(/\/$/, "");
+const API = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8085").replace(/\/$/, "");
 const TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, { target: string | null; at: number }>();
 

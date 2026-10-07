@@ -1,8 +1,9 @@
-# Next.js frontend. Built on the droplet with `docker compose build`, so the build is kept
-# memory-light: Node's heap is capped at 1.5 GB for `next build`.
+# Next.js frontend, for self-hosting only. Production runs on Vercel (vercel.json, region sin1);
+# this image is not part of backendR's deploy/docker-compose.prod.yml. Kept memory-light for
+# building on a small server: Node's heap is capped at 1.5 GB for `next build`.
 #
 # NEXT_PUBLIC_* values are inlined into the browser bundle at build time, so the API URL is a
-# build arg (set from deploy/.env by docker-compose.prod.yml), not a runtime env var.
+# build arg (docker build --build-arg NEXT_PUBLIC_API_URL=https://api.jachai.com .).
 
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
@@ -11,8 +12,8 @@ RUN npm ci --no-audit --no-fund
 
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
-ARG NEXT_PUBLIC_API_BASE_URL
-ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_TELEMETRY_DISABLED=1 \
     NODE_OPTIONS=--max-old-space-size=1536
 COPY --from=deps /app/node_modules ./node_modules

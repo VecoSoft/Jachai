@@ -11,7 +11,7 @@ import { SharePageClient } from "./share-page-client";
  * is the business name + headline, and the description is the caption.
  */
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:8085";
+const API = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL)?.replace(/\/$/, "") || "http://localhost:8085";
 
 async function load(postId: string): Promise<PromoSharePayload | null> {
   if (!/^[0-9a-f-]{36}$/i.test(postId)) return null;

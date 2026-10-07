@@ -1,5 +1,6 @@
+// NEXT_PUBLIC_API_URL (production name); NEXT_PUBLIC_API_BASE_URL still works for existing .env.local files.
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
+  (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL)?.replace(/\/$/, "") ||
   "http://localhost:8085";
 
 export const PAGE_SIZE = 20;
