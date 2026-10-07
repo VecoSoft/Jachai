@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bookmark, Languages, Moon, Phone, Receipt, Smile, Star, Store, Tag, User } from "lucide-react";
+import { Bookmark, KeyRound, Languages, Mail, MailPlus, Moon, Receipt, ShieldCheck, Smile, Star, Store, Tag, User } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useAuthModal } from "@/lib/auth-modal-context";
+import { useAddEmail } from "@/components/account/add-email-sheet";
 import { useCommunityUsernameModal } from "@/lib/community-username-modal-context";
 import { useLanguage } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
@@ -30,6 +32,8 @@ function MobileSettingsList() {
   const { theme, setTheme } = useTheme();
   const { show } = useToast();
   const { openModal } = useCommunityUsernameModal();
+  const { switchTo } = useAuthModal();
+  const addEmail = useAddEmail();
   const [languageSheetOpen, setLanguageSheetOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
 
@@ -79,10 +83,10 @@ function MobileSettingsList() {
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-[17px] font-semibold text-ink-900 dark:text-ink-100">
-                {profile.name || profile.phoneNumber}
+                {profile.name || profile.email}
               </p>
               <p className="truncate text-sm text-ink-500">
-                {profile.phoneNumber} · {isBusinessAccount ? "Business account" : "Personal account"}
+                {profile.email ? `${profile.email} · ` : ""}{isBusinessAccount ? "Business account" : "Personal account"}
               </p>
               <p className="text-sm font-medium text-crimson-600">Edit profile ›</p>
             </div>
@@ -98,7 +102,29 @@ function MobileSettingsList() {
             value={profile.communityUsername ? `u/${profile.communityUsername}` : undefined}
             onClick={handleCommunityProfileClick}
           />
-          <SettingsValueRow icon={Phone} label={t("account.mobile_number")} value={profile.phoneNumber} />
+          {profile.email && (
+            <SettingsValueRow
+              icon={Mail}
+              label={t("account.signin.email")}
+              value={`${profile.email} · ${profile.emailVerified ? t("account.signin.verified") : t("account.signin.not_verified")}`}
+            />
+          )}
+          <SettingsValueRow
+            icon={ShieldCheck}
+            label={t("account.signin.method")}
+            value={t(`account.signin.method.${profile.authProvider}`)}
+          />
+          {profile.needsEmail ? (
+            <SettingsNavRow icon={MailPlus} label={t("addemail.cta")} onClick={() => addEmail.open()} />
+          ) : (
+            profile.email && (
+              <SettingsNavRow
+                icon={KeyRound}
+                label={t("account.signin.set_password")}
+                onClick={() => switchTo("forgot-password", profile.email ?? undefined)}
+              />
+            )
+          )}
           {canSwitchAccount && (
             <SettingsNavRow
               icon={Store}

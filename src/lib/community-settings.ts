@@ -66,6 +66,9 @@ const DEFAULT_FEATURES: PlatformFeatures = {
   newSignupsEnabled: true,
   maintenanceMode: false,
   maintenanceMessage: null,
+  googleLoginEnabled: true,
+  passwordLoginEnabled: true,
+  phoneOtpEnabled: false,
 };
 
 /**

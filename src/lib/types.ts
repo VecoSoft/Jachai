@@ -21,7 +21,6 @@ export type PreferredLanguage = "en" | "bn";
 
 export interface UserProfile {
   id: string;
-  phoneNumber: string;
   role: UserRole;
   name: string | null;
   profilePhotoUrl: string | null;
@@ -38,6 +37,25 @@ export interface UserProfile {
   communityGender: CommunityGender | null;
   /** V59: whether the M/F badge is shown to other people (the owner always sees their own choice). */
   communityGenderVisible: boolean;
+  /** V70 sign-in e-mail (null for a phone-only account created before e-mail login). */
+  email: string | null;
+  emailVerified: boolean;
+  authProvider: AuthProvider;
+  /** Whether a password is set (a Google-only account can add one through "Forgot password"). */
+  hasPassword: boolean;
+  googleLinked: boolean;
+  /** Phone-only account from before e-mail login: the app asks to add an e-mail. */
+  needsEmail: boolean;
+}
+
+/** How an account signs in (V70). PHONE = created before e-mail login. */
+export type AuthProvider = "GOOGLE" | "PASSWORD" | "BOTH" | "PHONE";
+
+/** Answer to sign-up / "resend code": show the code screen for {@code email}. */
+export interface VerificationPending {
+  status: "VERIFICATION_REQUIRED";
+  email: string;
+  resendAfterSeconds: number;
 }
 
 /** V59 community gender badge. */
@@ -547,7 +565,6 @@ export interface PlaceOrderBody {
   fulfillmentType: FulfillmentType;
   paymentMethod: PaymentMethod;
   customerName: string;
-  customerPhone: string;
   deliveryAddress?: string | null;
   deliveryLat?: number | null;
   deliveryLng?: number | null;
@@ -591,7 +608,6 @@ export interface Order {
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   customerName: string;
-  customerPhone: string;
   deliveryAddress: string | null;
   deliveryLatitude: number | null;
   deliveryLongitude: number | null;
@@ -618,7 +634,6 @@ export interface PlaceBookingBody {
   /** "HH:mm" (24h) */
   preferredTime: string;
   customerName: string;
-  customerPhone: string;
   customerNote?: string | null;
 }
 
@@ -644,7 +659,6 @@ export interface Booking {
   preferredDate: string;
   preferredTime: string;
   customerName: string;
-  customerPhone: string;
   customerNote: string | null;
   rejectionReason: string | null;
   createdAt: string;
@@ -1163,6 +1177,10 @@ export interface PlatformFeatures {
   newSignupsEnabled: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string | null;
+  // V70 sign-in methods
+  googleLoginEnabled: boolean;
+  passwordLoginEnabled: boolean;
+  phoneOtpEnabled: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1182,6 +1200,11 @@ export interface ApiError {
   error: string;
   message: string;
   path: string;
+  /** Machine-readable error code (V70 auth: INVALID_CREDENTIALS, EMAIL_NOT_VERIFIED, CODE_INVALID, ...). */
+  code?: string;
+  attemptsLeft?: number;
+  retryAfterSeconds?: number;
+  email?: string;
 }
 
 // Lightweight local cache entry used to bridge gaps where the backend

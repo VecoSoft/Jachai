@@ -6,7 +6,6 @@ import { useAuth } from "@/lib/auth-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
 import { Button } from "./ui/button";
 import { CreateBusinessAccountModal } from "./create-business-account-modal";
-import { LinkAccountsModal } from "./link-accounts-modal";
 
 /**
  * Shown wherever a personal (CONSUMER) account hits a Business-only surface
@@ -26,7 +25,6 @@ export function BusinessAccountCta({
   const router = useRouter();
   const [switching, setSwitching] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [linkModalOpen, setLinkModalOpen] = useState(false);
 
   async function handleSwitch() {
     setSwitching(true);
@@ -53,12 +51,7 @@ export function BusinessAccountCta({
           <Button className="mt-5" onClick={() => setModalOpen(true)}>
             Create a Business account
           </Button>
-          <CreateBusinessAccountModal
-            open={modalOpen}
-            onClose={() => setModalOpen(false)}
-            onLinkInstead={() => setLinkModalOpen(true)}
-          />
-          <LinkAccountsModal open={linkModalOpen} onClose={() => setLinkModalOpen(false)} />
+          <CreateBusinessAccountModal open={modalOpen} onClose={() => setModalOpen(false)} />
         </>
       )}
     </div>

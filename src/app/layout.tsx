@@ -4,6 +4,7 @@ import "./globals.css";
 import { MaintenanceGate } from "@/components/maintenance-gate";
 import { AuthProvider } from "@/lib/auth-context";
 import { AuthModalProvider } from "@/lib/auth-modal-context";
+import { AddEmailProvider } from "@/components/account/add-email-sheet";
 import { CommunityUsernameModalProvider } from "@/lib/community-username-modal-context";
 import { HomeSearchProvider } from "@/lib/home-search-context";
 import { LanguageProvider } from "@/lib/language-context";
@@ -66,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthProvider>
               <LanguageProvider>
                 <AuthModalProvider>
+                  <AddEmailProvider>
                   <CommunityUsernameModalProvider>
                     <LocationProvider>
                       <HomeSearchProvider>
@@ -77,6 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       </HomeSearchProvider>
                     </LocationProvider>
                   </CommunityUsernameModalProvider>
+                  </AddEmailProvider>
                 </AuthModalProvider>
               </LanguageProvider>
             </AuthProvider>

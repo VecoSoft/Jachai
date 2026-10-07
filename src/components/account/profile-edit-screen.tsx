@@ -133,10 +133,12 @@ export function ProfileEditScreen() {
               className="min-w-0 flex-1 bg-transparent text-[16px] text-ink-900 placeholder:text-ink-300 focus:outline-none dark:text-ink-100"
             />
           </div>
-          <div className="flex items-center gap-3 py-3">
-            <span className="w-24 shrink-0 text-sm text-ink-500">{t("account.mobile_number")}</span>
-            <span className="min-w-0 flex-1 truncate text-[16px] text-ink-500">{profile.phoneNumber}</span>
-          </div>
+          {profile.email && (
+            <div className="flex items-center gap-3 py-3">
+              <span className="w-24 shrink-0 text-sm text-ink-500">{t("account.signin.email")}</span>
+              <span className="min-w-0 flex-1 truncate text-[16px] text-ink-500">{profile.email}</span>
+            </div>
+          )}
         </div>
 
         <Button className="mt-8 hidden w-full md:inline-flex" onClick={handleDone} disabled={!dirty} loading={saving}>

@@ -9,6 +9,8 @@ const imageHosts = [
   { protocol: "https", hostname: "media.jachai.com" },
   { protocol: "https", hostname: "jachai-media.sgp1.cdn.digitaloceanspaces.com" },
   { protocol: "https", hostname: "jachai-media.sgp1.digitaloceanspaces.com" },
+  // Profile photos of accounts created with Google Sign-In
+  { protocol: "https", hostname: "lh3.googleusercontent.com" },
   // Local development
   { protocol: "http", hostname: "localhost", port: "8085" },
   { protocol: "http", hostname: "127.0.0.1", port: "8085" },

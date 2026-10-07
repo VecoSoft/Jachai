@@ -10,6 +10,9 @@ import { useCart } from "@/lib/use-cart";
 import { billedQty, clearCart, removeLine, setQuantity } from "@/lib/cart";
 import { formatTk, paymentMethodLabel } from "@/lib/commerce";
 import { errorMessage } from "@/lib/toast-context";
+import { authErrorText, errorCode } from "@/lib/auth-errors";
+import { useLanguage } from "@/lib/language-context";
+import { useAddEmail } from "@/components/account/add-email-sheet";
 import type {
   BusinessResponse,
   DeliveryQuote,
@@ -27,6 +30,8 @@ import { useCommunitySettings, usePlatformFeatures } from "@/lib/community-setti
 export default function CheckoutPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
+  const { t } = useLanguage();
+  const addEmail = useAddEmail();
   const { user, profile } = useAuth();
   const { openLogin } = useAuthModal();
   const { cart, count, subtotal } = useCart();
@@ -45,7 +50,6 @@ export default function CheckoutPage() {
   const [quoting, setQuoting] = useState(false);
 
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
   const [payment, setPayment] = useState<PaymentMethod | null>(null);
 
@@ -80,7 +84,6 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (profile) {
       setName((n) => n || profile.name || "");
-      setPhone((p) => p || profile.phoneNumber || "");
     }
   }, [profile]);
 
@@ -142,14 +145,14 @@ export default function CheckoutPage() {
     subtotal < quote.minimumOrderAmount;
 
   const canPlace = useMemo(() => {
-    if (!fulfillment || !payment || !name.trim() || !phone.trim() || count === 0) return false;
+    if (!fulfillment || !payment || !name.trim() || count === 0) return false;
     if (fulfillment === "OWN_DELIVERY") {
       if (!address.trim() || !pin) return false;
       if (!quote?.deliverable) return false;
       if (belowMin) return false;
     }
     return true;
-  }, [fulfillment, payment, name, phone, count, address, pin, quote, belowMin]);
+  }, [fulfillment, payment, name, count, address, pin, quote, belowMin]);
 
   async function placeOrder() {
     if (!business || !cart || !fulfillment || !payment) return;
@@ -160,7 +163,6 @@ export default function CheckoutPage() {
         fulfillmentType: fulfillment,
         paymentMethod: payment,
         customerName: name.trim(),
-        customerPhone: phone.trim(),
         deliveryAddress: fulfillment === "OWN_DELIVERY" ? address.trim() : null,
         deliveryLat: fulfillment === "OWN_DELIVERY" ? pin?.lat ?? null : null,
         deliveryLng: fulfillment === "OWN_DELIVERY" ? pin?.lng ?? null : null,
@@ -170,7 +172,8 @@ export default function CheckoutPage() {
       clearCart();
       router.push(`/orders/${order.id}`);
     } catch (e) {
-      setPlaceError(errorMessage(e));
+      if (errorCode(e) === "EMAIL_VERIFICATION_REQUIRED") addEmail.open("addemail.required");
+      setPlaceError(errorCode(e) ? authErrorText(e, t) : errorMessage(e));
     } finally {
       setPlacing(false);
     }
@@ -382,10 +385,6 @@ export default function CheckoutPage() {
           <div>
             <Label htmlFor="name">Name</Label>
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div>
-            <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
         </div>
         <div className="mt-3">

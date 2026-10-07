@@ -1,5 +1,6 @@
 "use client";
 
+import { MessageCustomerButton } from "@/components/owner/message-customer-button";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { bookingApi } from "@/lib/api";
@@ -131,9 +132,8 @@ export default function OwnerBookingsPage() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-bold text-ink-900">{b.bookingNumber}</p>
-                    <p className="text-xs text-ink-500">
-                      {b.customerName} · {b.customerPhone}
-                    </p>
+                    <p className="text-xs text-ink-500">{b.customerName}</p>
+                    <MessageCustomerButton kind="booking" id={b.id} />
                     <p className="text-[11px] text-ink-400">Requested {timeAgo(b.createdAt)}</p>
                   </div>
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${BOOKING_STATUS_TONE[b.status]}`}>

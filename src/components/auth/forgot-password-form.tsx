@@ -1,204 +1,150 @@
 "use client";
 
 import { useState } from "react";
-import { ApiClientError, authApi } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
+import { authApi } from "@/lib/api";
+import { authErrorText, errorCode } from "@/lib/auth-errors";
 import { useLanguage } from "@/lib/language-context";
-import { errorMessage, useToast } from "@/lib/toast-context";
-import { isValidBdPhone, isValidPassword, normalizeBdPhone } from "@/lib/utils";
+import { useToast } from "@/lib/toast-context";
 import { Button } from "@/components/ui/button";
-import { FieldError, FieldHint, Input, Label } from "@/components/ui/field";
+import { FieldError, Input, Label } from "@/components/ui/field";
+import { CodeInput, useCountdown } from "./code-input";
+import { PasswordField } from "./password-field";
 
-const RESEND_COOLDOWN_SECONDS = 60;
-
+/**
+ * Forgot password: e-mail → (code by e-mail) → code + new password. The first step answers the
+ * same whether or not the address has an account. Resetting signs out every device, so the user
+ * logs in again with the new password.
+ */
 export function ForgotPasswordForm({
-  onSuccess,
+  initialEmail,
   onSwitchToLogin,
 }: {
-  onSuccess: () => void;
+  initialEmail?: string;
+  onSuccess?: () => void;
   onSwitchToLogin: () => void;
 }) {
-  const { login } = useAuth();
-  const { show } = useToast();
   const { t } = useLanguage();
-
-  const [step, setStep] = useState<"phone" | "reset">("phone");
-  // Consumer and Business are separate accounts — this picks which one's
-  // password is being reset (same phone number can back both, see AuthService#resetPassword).
-  const [asBusiness, setAsBusiness] = useState(false);
-  const [phone, setPhone] = useState("");
+  const { show } = useToast();
+  const [step, setStep] = useState<"email" | "reset">("email");
+  const [email, setEmail] = useState(initialEmail ?? "");
   const [code, setCode] = useState("");
-  const [newPassword, setNewPassword] = useState("");
+  const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [cooldown, startCooldown] = useCountdown(0);
 
-  function startCooldown() {
-    setCooldown(RESEND_COOLDOWN_SECONDS);
-    const timer = setInterval(() => {
-      setCooldown((c) => {
-        if (c <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-  }
-
-  async function requestOtp() {
+  async function sendCode() {
     setError(null);
-    if (!isValidBdPhone(phone)) {
-      setError(t("auth.error.invalid_phone"));
+    if (!email.trim()) {
+      setError(t("auth.err.INVALID_EMAIL"));
       return;
     }
-    setSending(true);
+    setBusy(true);
     try {
-      await authApi.requestOtp(normalizeBdPhone(phone));
+      await authApi.forgotPassword(email.trim());
+      startCooldown(60);
       setStep("reset");
-      startCooldown();
-      show(t("auth.toast.otp_sent"), "success");
     } catch (err) {
-      if (err instanceof ApiClientError && err.status === 429) {
-        setError(t("auth.error.too_many_otp"));
-      } else {
-        setError(errorMessage(err));
-      }
+      setError(authErrorText(err, t));
     } finally {
-      setSending(false);
+      setBusy(false);
     }
   }
 
-  async function resetPassword() {
+  async function reset() {
     setError(null);
-    if (code.trim().length < 4) {
-      setError(t("auth.error.enter_code"));
+    if (code.length !== 6) {
+      setError(t("auth.err.CODE_EXPIRED"));
       return;
     }
-    if (!isValidPassword(newPassword)) {
-      setError(t("auth.error.password_min"));
+    if (password !== confirmPassword) {
+      setError(t("auth.err.PASSWORD_MISMATCH"));
       return;
     }
-    if (newPassword !== confirmPassword) {
-      setError(t("auth.error.passwords_mismatch"));
-      return;
-    }
-    setResetting(true);
+    setBusy(true);
     try {
-      const tokens = await authApi.resetPassword(
-        normalizeBdPhone(phone),
-        code.trim(),
-        newPassword,
-        asBusiness ? "BUSINESS_OWNER" : "CONSUMER"
-      );
-      login(tokens);
-      show(t("auth.toast.password_reset"), "success");
-      onSuccess();
+      await authApi.resetPassword({ email: email.trim(), code, password, confirmPassword });
+      show(t("auth.toast.password_changed"), "success");
+      onSwitchToLogin();
     } catch (err) {
-      setError(errorMessage(err));
+      setError(authErrorText(err, t));
+      if (errorCode(err) === "CODE_EXPIRED" || errorCode(err) === "CODE_TOO_MANY_ATTEMPTS") setCode("");
     } finally {
-      setResetting(false);
+      setBusy(false);
     }
   }
 
   if (step === "reset") {
     return (
-      <div className="space-y-4">
-        <p className="text-sm text-ink-500">{t("auth.sent_to", { phone: normalizeBdPhone(phone) })}</p>
-
-        <div>
-          <Label htmlFor="reset-code">{t("auth.otp_code_label")}</Label>
-          <Input
-            id="reset-code"
-            inputMode="numeric"
-            autoFocus
-            placeholder="••••••"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="reset-new-password">{t("auth.new_password")}</Label>
-          <Input
-            id="reset-new-password"
-            type="password"
-            placeholder="••••••••"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-          />
-          <FieldHint>{t("auth.hint.min_8_chars")}</FieldHint>
-        </div>
-
-        <div>
-          <Label htmlFor="reset-confirm-password">{t("auth.confirm_new_password")}</Label>
-          <Input
-            id="reset-confirm-password"
-            type="password"
-            placeholder="••••••••"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && resetPassword()}
-          />
-        </div>
-
+      <div className="space-y-5">
+        <p className="text-sm text-ink-500 break-words">{t("auth.forgot.sent", { email: email.trim() })}</p>
+        <CodeInput value={code} onChange={setCode} disabled={busy} invalid={Boolean(error)} />
+        <PasswordField
+          id="reset-password"
+          label={t("auth.new_password")}
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          showStrength
+          autoFocus={false}
+        />
+        <PasswordField
+          id="reset-password-again"
+          label={t("auth.password_retype")}
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          onEnter={() => void reset()}
+          autoComplete="new-password"
+        />
         <FieldError>{error}</FieldError>
-
-        <Button className="w-full" size="lg" onClick={resetPassword} loading={resetting}>
-          {t("auth.reset_password_button")}
+        <Button className="w-full" size="lg" onClick={() => void reset()} loading={busy}>
+          {t("auth.forgot.set_new")}
         </Button>
-
-        <div className="flex justify-between text-sm text-ink-500">
-          <button type="button" onClick={() => setStep("phone")} className="hover:underline">
-            {t("auth.change_number")}
+        <div className="flex items-center justify-between gap-3 text-sm text-ink-500">
+          <button type="button" onClick={() => setStep("email")} className="hover:underline">
+            {t("auth.verify.use_other_email")}
           </button>
           <button
             type="button"
-            onClick={requestOtp}
-            disabled={cooldown > 0 || sending}
-            className="hover:underline disabled:opacity-50"
+            onClick={() => void sendCode()}
+            disabled={cooldown > 0 || busy}
+            className="font-medium text-crimson-700 hover:underline disabled:text-ink-400 disabled:no-underline"
           >
             {cooldown > 0 ? t("auth.resend_in", { n: cooldown }) : t("auth.resend_code")}
           </button>
         </div>
+        <p className="text-xs text-ink-400">{t("auth.verify.spam_hint")}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <p className="text-sm text-ink-500">{t("auth.forgot.intro")}</p>
       <div>
-        <Label htmlFor="forgot-phone">{t("auth.mobile_number")}</Label>
+        <Label htmlFor="forgot-email">{t("auth.email")}</Label>
         <Input
-          id="forgot-phone"
-          inputMode="tel"
-          placeholder="01712345678"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && requestOtp()}
+          id="forgot-email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          autoFocus
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && void sendCode()}
         />
       </div>
-
-      <button
-        type="button"
-        onClick={() => setAsBusiness((v) => !v)}
-        className="text-sm text-ink-500 hover:text-ink-800 hover:underline"
-      >
-        {asBusiness ? "Resetting your Business account's password" : "Resetting your personal account's password"} —
-        switch?
-      </button>
-
       <FieldError>{error}</FieldError>
-
-      <Button className="w-full" size="lg" onClick={requestOtp} loading={sending}>
+      <Button className="w-full" size="lg" onClick={() => void sendCode()} loading={busy}>
         {t("auth.send_code")}
       </Button>
-
       <p className="text-center text-sm text-ink-500">
         {t("auth.remembered_password")}{" "}
-        <button type="button" onClick={onSwitchToLogin} className="text-crimson-700 hover:underline font-medium">
+        <button type="button" onClick={onSwitchToLogin} className="font-medium text-crimson-700 hover:underline">
           {t("nav.log_in")}
         </button>
       </p>

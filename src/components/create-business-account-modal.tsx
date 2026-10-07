@@ -10,34 +10,22 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, FieldError } from "@/components/ui/field";
 
 /**
- * In-session shortcut for a logged-in personal (CONSUMER) account to create
- * its paired Business account — same phone number, its own password/name.
- * The phone is already OTP-verified from the personal signup, so no OTP step
- * here; on success the two accounts are auto-linked and this modal switches
- * the session straight into the new business account (POST
- * /auth/register-business, see AuthService#registerBusinessFromConsumer).
+ * In-session shortcut for a logged-in personal (CONSUMER) account to create its paired Business
+ * account. The business account has no login of its own: it is opened through the personal
+ * account (the account switcher, or "log in to your business account"). On success the two are
+ * linked and the session switches straight into the new business account
+ * (POST /auth/register-business, see AuthService#registerBusinessFromConsumer).
  */
-export function CreateBusinessAccountModal({
-  open,
-  onClose,
-  onLinkInstead,
-}: {
-  open: boolean;
-  onClose: () => void;
-  /** Optional — when provided, offers an escape hatch to the link-accounts flow instead (for the case a Business account already exists for this phone but isn't linked yet). The caller owns showing that modal, since it needs to outlive this one closing. */
-  onLinkInstead?: () => void;
-}) {
+export function CreateBusinessAccountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { login } = useAuth();
   const { show } = useToast();
   const router = useRouter();
   const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function handleClose() {
     setName("");
-    setPassword("");
     setError(null);
     setBusy(false);
     onClose();
@@ -47,7 +35,7 @@ export function CreateBusinessAccountModal({
     setError(null);
     setBusy(true);
     try {
-      const tokens = await authApi.registerBusiness(password, name.trim());
+      const tokens = await authApi.registerBusiness(name.trim());
       login(tokens);
       show("Business account created — you're switched in.", "success");
       handleClose();
@@ -66,8 +54,8 @@ export function CreateBusinessAccountModal({
           Create your Business account
         </h2>
         <p className="mt-1.5 text-sm text-ink-500">
-          A separate account for managing your listings — same phone number, its own password and name. You&apos;ll
-          be switched into it right away.
+          A separate account for managing your listings, opened from your personal account — no extra password.
+          You&apos;ll be switched into it right away.
         </p>
 
         <div className="mt-5 space-y-4">
@@ -79,40 +67,13 @@ export function CreateBusinessAccountModal({
               placeholder="e.g. your name or business name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="biz-account-password">Password</Label>
-            <Input
-              id="biz-account-password"
-              type="password"
-              placeholder="At least 8 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
+              onKeyDown={(e) => e.key === "Enter" && name.trim() && void submit()}
             />
           </div>
           <FieldError>{error}</FieldError>
-          <Button
-            className="w-full"
-            onClick={submit}
-            loading={busy}
-            disabled={!name.trim() || password.length < 8}
-          >
+          <Button className="w-full" onClick={() => void submit()} loading={busy} disabled={!name.trim()}>
             Create &amp; switch
           </Button>
-          {onLinkInstead && (
-            <button
-              type="button"
-              onClick={() => {
-                handleClose();
-                onLinkInstead();
-              }}
-              className="w-full text-center text-xs text-ink-400 hover:text-ink-700 hover:underline"
-            >
-              Already have a Business account for this number? Link it instead.
-            </button>
-          )}
         </div>
       </div>
     </Modal>

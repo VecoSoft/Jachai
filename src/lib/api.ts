@@ -112,6 +112,7 @@ import type {
   ReviewSortOption,
   SubmitReviewRequest,
   TokenPairDto,
+  VerificationPending,
   UpdateBusinessRequest,
   UpdateCommunityPostBody,
   UpdateOfferBody,
@@ -269,53 +270,57 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 // Auth / OTP
 // ---------------------------------------------------------------------------
 export const authApi = {
-  requestOtp: (phoneNumber: string) =>
-    request<void>("/api/v1/otp/request", { method: "POST", body: { phoneNumber }, auth: false }),
+  // ---------------------------------------------------------------------
+  // V70 sign-in: Google Sign-In + e-mail/password. Phone + OTP login is
+  // switched off (backend phone_otp flag); the admin panel login is separate.
+  // `context` omitted (or CONSUMER) opens the personal account; BUSINESS_OWNER
+  // opens its linked business account (two-account model).
+  // ---------------------------------------------------------------------
 
-  register: (phoneNumber: string, code: string, password: string, role: UserRole, name: string) =>
-    request<TokenPairDto>("/api/v1/auth/register", {
+  /** "Continue with Google": the Google Identity Services credential (an ID token). */
+  google: (idToken: string, context?: UserRole) =>
+    request<TokenPairDto>("/api/v1/auth/google", {
       method: "POST",
-      body: { phoneNumber, code, password, role, name },
+      body: { idToken, context: context ?? null },
       auth: false,
     }),
 
-  // context omitted (or CONSUMER) logs into the personal account; pass
-  // BUSINESS_OWNER to log into a linked business account instead — the two
-  // are separate accounts (see lib/api.ts's ownerApi for the switch/link flow).
-  login: (phoneNumber: string, password: string, context?: UserRole) =>
+  /** Sign-up: nothing is signed in yet — a 6-digit code goes to the e-mail (see verifyEmail). */
+  register: (body: { name: string; email: string; password: string; confirmPassword: string; language: PreferredLanguage }) =>
+    request<VerificationPending>("/api/v1/auth/register", { method: "POST", body, auth: false }),
+
+  verifyEmail: (email: string, code: string) =>
+    request<TokenPairDto>("/api/v1/auth/verify-email", { method: "POST", body: { email, code }, auth: false }),
+
+  resendVerification: (email: string) =>
+    request<VerificationPending>("/api/v1/auth/resend-verification", { method: "POST", body: { email }, auth: false }),
+
+  login: (email: string, password: string, context?: UserRole) =>
     request<TokenPairDto>("/api/v1/auth/login", {
       method: "POST",
-      body: { phoneNumber, password, context: context ?? null },
+      body: { email, password, context: context ?? null },
       auth: false,
     }),
 
-  resetPassword: (phoneNumber: string, code: string, newPassword: string, role: UserRole) =>
-    request<TokenPairDto>("/api/v1/auth/reset-password", {
-      method: "POST",
-      body: { phoneNumber, code, newPassword, role },
-      auth: false,
-    }),
+  /** Always the same answer, whether or not the address has an account. */
+  forgotPassword: (email: string) =>
+    request<{ status: string }>("/api/v1/auth/forgot-password", { method: "POST", body: { email }, auth: false }),
+
+  /** Sets the new password; every device is signed out, so the user logs in again afterwards. */
+  resetPassword: (body: { email: string; code: string; password: string; confirmPassword: string }) =>
+    request<{ status: string }>("/api/v1/auth/reset-password", { method: "POST", body, auth: false }),
 
   logout: () => request<void>("/api/v1/auth/logout", { method: "POST" }),
-
-  // ---------------------------------------------------------------------
-  // Two-account model: consumer + business are separate logins, optionally
-  // linked for a frictionless switch (see components/navbar.tsx).
-  // ---------------------------------------------------------------------
 
   /** Frictionless switch to the caller's linked counterpart account — no password re-entry. */
   switchAccount: () => request<TokenPairDto>("/api/v1/auth/switch-account", { method: "POST" }),
 
-  /** Logged-in consumer account creates+links its business-account counterpart in one step. */
-  registerBusiness: (password: string, name: string) =>
+  /** Signed-in personal account creates + links its business account (opened through the personal account). */
+  registerBusiness: (name: string) =>
     request<TokenPairDto>("/api/v1/auth/register-business", {
       method: "POST",
-      body: { password, name },
+      body: { name },
     }),
-
-  /** Links the caller's account with an independently-registered opposite-role account under the same phone, via OTP proof. */
-  linkAccounts: (code: string) =>
-    request<void>("/api/v1/auth/link-accounts", { method: "POST", body: { code } }),
 };
 
 // ---------------------------------------------------------------------------
@@ -323,6 +328,16 @@ export const authApi = {
 // ---------------------------------------------------------------------------
 export const userApi = {
   me: () => request<UserProfile>("/api/v1/users/me"),
+
+  // V70: a phone-only account (from before e-mail login) adds an e-mail + password, or links Google.
+  addEmail: (email: string, password: string, confirmPassword: string) =>
+    request<VerificationPending>("/api/v1/users/me/email", { method: "POST", body: { email, password, confirmPassword } }),
+
+  verifyAddedEmail: (email: string, code: string) =>
+    request<UserProfile>("/api/v1/users/me/email/verify", { method: "POST", body: { email, code } }),
+
+  linkGoogle: (idToken: string) =>
+    request<UserProfile>("/api/v1/users/me/google", { method: "POST", body: { idToken } }),
 
   update: (name: string | null, preferredLanguage: PreferredLanguage, profilePhotoUrl: string | null) =>
     request<UserProfile>("/api/v1/users/me", {
@@ -1153,6 +1168,8 @@ export const orderApi = {
     request<PageResponse<Order>>("/api/v1/orders/mine", { query: { page, size } }),
   get: (id: string) => request<Order>(`/api/v1/orders/${id}`),
   cancel: (id: string) => request<Order>(`/api/v1/orders/${id}/cancel`, { method: "POST" }),
+  /** Owner: opens (or creates) the chat with this order's customer — V70 replaced the customer phone. */
+  customerChat: (id: string) => request<{ threadId: string }>(`/api/v1/orders/${id}/customer-chat`, { method: "POST" }),
 
   ownerList: (businessId: string, status?: OrderStatus, page = 0, size = 20) =>
     request<PageResponse<Order>>(`/api/v1/businesses/${businessId}/orders`, {
@@ -1183,6 +1200,8 @@ export const bookingApi = {
     request<PageResponse<Booking>>("/api/v1/bookings/mine", { query: { page, size } }),
   get: (id: string) => request<Booking>(`/api/v1/bookings/${id}`),
   cancel: (id: string) => request<Booking>(`/api/v1/bookings/${id}/cancel`, { method: "POST" }),
+  /** Owner: opens (or creates) the chat with this booking's customer. */
+  customerChat: (id: string) => request<{ threadId: string }>(`/api/v1/bookings/${id}/customer-chat`, { method: "POST" }),
   /** Live queue position/ETA — customer or owner; `applicable: false` for anything not CONFIRMED-today. */
   queueStatus: (id: string) => request<QueueStatus>(`/api/v1/bookings/${id}/queue-status`),
 

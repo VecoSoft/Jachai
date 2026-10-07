@@ -7,6 +7,8 @@ import { useAuth } from "@/lib/auth-context";
 import { useAuthModal } from "@/lib/auth-modal-context";
 import { useLanguage } from "@/lib/language-context";
 import { errorMessage, useToast } from "@/lib/toast-context";
+import { errorCode } from "@/lib/auth-errors";
+import { useAddEmail } from "@/components/account/add-email-sheet";
 import type { AvailabilityResponse, Booking, ServiceOffering, TeamMember } from "@/lib/types";
 import { Modal } from "./ui/modal";
 import { Button } from "./ui/button";
@@ -52,6 +54,7 @@ export function BookingModal({
   const { openLogin } = useAuthModal();
   const { show } = useToast();
   const { t } = useLanguage();
+  const addEmail = useAddEmail();
 
   const [staff, setStaff] = useState<TeamMember[] | null>(null);
   const [staffId, setStaffId] = useState(ANY_STAFF);
@@ -61,7 +64,6 @@ export function BookingModal({
   const [time, setTime] = useState<string | null>(null);
   const [slotError, setSlotError] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [booked, setBooked] = useState<Booking | null>(null);
@@ -84,7 +86,6 @@ export function BookingModal({
     setNote("");
     setBooked(null);
     setName(profile?.name ?? "");
-    setPhone(profile?.phoneNumber ?? "");
   }, [open, profile]);
 
   useEffect(() => {
@@ -100,7 +101,7 @@ export function BookingModal({
   }, [open, businessId, service, staff, staffId, date]);
 
   async function submit() {
-    if (!service || !time || !name.trim() || !phone.trim()) return;
+    if (!service || !time || !name.trim()) return;
     setSubmitting(true);
     setSlotError(null);
     try {
@@ -110,7 +111,6 @@ export function BookingModal({
         preferredDate: date,
         preferredTime: time,
         customerName: name.trim(),
-        customerPhone: phone.trim(),
         customerNote: note.trim() || null,
       });
       setBooked(b);
@@ -123,6 +123,8 @@ export function BookingModal({
           .availability(businessId, service.id, staffId || null, date)
           .then(setAvailability)
           .catch(() => undefined);
+      } else if (errorCode(e) === "EMAIL_VERIFICATION_REQUIRED") {
+        addEmail.open("addemail.required");
       } else {
         show(errorMessage(e), "error");
       }
@@ -131,7 +133,7 @@ export function BookingModal({
     }
   }
 
-  const canSubmit = !!time && !!name.trim() && !!phone.trim();
+  const canSubmit = !!time && !!name.trim();
   const noStaffAtAll = staff !== null && staff.length === 0;
 
   return (
@@ -249,15 +251,9 @@ export function BookingModal({
                   {slotError && <p className="mt-1.5 text-xs font-medium text-rose-600">{slotError}</p>}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="bname">{t("booking.field.name")}</Label>
-                    <Input id="bname" value={name} onChange={(e) => setName(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label htmlFor="bphone">{t("booking.field.phone")}</Label>
-                    <Input id="bphone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                  </div>
+                <div>
+                  <Label htmlFor="bname">{t("booking.field.name")}</Label>
+                  <Input id="bname" value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
 
                 <div>

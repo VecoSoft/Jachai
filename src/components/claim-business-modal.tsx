@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { claimApi, uploadFileToPresignedUrl } from "@/lib/api";
 import { errorMessage, useToast } from "@/lib/toast-context";
+import { usePlatformFeatures } from "@/lib/community-settings";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input, Label, FieldError } from "@/components/ui/field";
@@ -27,6 +28,8 @@ export function ClaimBusinessModal({
   alreadyClaimed?: boolean;
 }) {
   const { show } = useToast();
+  // Claim by SMS code only while SMS is on (phone OTP flag); e-mail and document always work.
+  const { phoneOtpEnabled } = usePlatformFeatures();
   const [step, setStep] = useState<Step>(alreadyClaimed ? "document" : "choose");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +139,7 @@ export function ClaimBusinessModal({
         {step === "choose" && (
           <div className="mt-5 space-y-3">
             <p className="text-sm text-ink-500">Verify you own this business to claim it.</p>
+            {phoneOtpEnabled && (
             <button
               onClick={startPhone}
               disabled={busy}
@@ -144,6 +148,7 @@ export function ClaimBusinessModal({
               <p className="text-sm font-semibold text-ink-800">Verify by phone</p>
               <p className="text-xs text-ink-500 mt-0.5">We&apos;ll text a code to the number listed on this business.</p>
             </button>
+            )}
             <button
               onClick={() => setStep("email-address")}
               disabled={busy}

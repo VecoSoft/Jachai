@@ -59,7 +59,7 @@ function IllustrationPanel() {
 }
 
 export function AuthModal() {
-  const { mode, switchTo, close } = useAuthModal();
+  const { mode, prefillEmail, switchTo, close } = useAuthModal();
   const { t } = useLanguage();
 
   return (
@@ -67,7 +67,7 @@ export function AuthModal() {
       <div className="grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] max-h-[90vh]">
         <IllustrationPanel />
 
-        <div className="relative p-8 sm:p-10 overflow-y-auto">
+        <div className="relative px-5 py-7 sm:p-10 overflow-y-auto">
           <button
             type="button"
             onClick={close}
@@ -91,12 +91,12 @@ export function AuthModal() {
                   <LoginForm
                     onSuccess={close}
                     onSwitchToSignup={() => switchTo("signup")}
-                    onSwitchToForgotPassword={() => switchTo("forgot-password")}
+                    onSwitchToForgotPassword={(email) => switchTo("forgot-password", email)}
                   />
                 )}
                 {mode === "signup" && <SignupForm onSuccess={close} onSwitchToLogin={() => switchTo("login")} />}
                 {mode === "forgot-password" && (
-                  <ForgotPasswordForm onSuccess={close} onSwitchToLogin={() => switchTo("login")} />
+                  <ForgotPasswordForm initialEmail={prefillEmail} onSuccess={close} onSwitchToLogin={() => switchTo("login")} />
                 )}
               </div>
             </>

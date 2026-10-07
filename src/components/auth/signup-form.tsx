@@ -1,17 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { ApiClientError, authApi } from "@/lib/api";
+import { authApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { useLanguage } from "@/lib/language-context";
-import { errorMessage, useToast } from "@/lib/toast-context";
-import { isValidBdPhone, isValidPassword, normalizeBdPhone } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { authErrorText } from "@/lib/auth-errors";
 import { usePlatformFeatures } from "@/lib/community-settings";
-import { FieldError, FieldHint, Input, Label } from "@/components/ui/field";
+import { useLanguage } from "@/lib/language-context";
+import { useToast } from "@/lib/toast-context";
+import type { TokenPairDto } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { FieldError, Input, Label } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/misc";
+import { CodeStep } from "./code-step";
+import { GoogleButton, useGoogleSignInAvailable } from "./google-button";
+import { OrDivider } from "./login-form";
+import { PasswordField } from "./password-field";
 
-const RESEND_COOLDOWN_SECONDS = 60;
-
+/**
+ * Sign up: "Continue with Google", or name + e-mail + password (with re-type, show/hide and a live
+ * strength hint). An e-mail sign-up is only active once the 6-digit code from the e-mail is entered.
+ */
 export function SignupForm({
   onSuccess,
   onSwitchToLogin,
@@ -21,201 +29,164 @@ export function SignupForm({
 }) {
   const { login } = useAuth();
   const { show } = useToast();
-  const { t } = useLanguage();
-  const signupsOpen = usePlatformFeatures().newSignupsEnabled;
+  const { t, lang } = useLanguage();
+  const { newSignupsEnabled, passwordLoginEnabled } = usePlatformFeatures();
+  const googleAvailable = useGoogleSignInAvailable();
 
-  const [step, setStep] = useState<"details" | "otp">("details");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [pending, setPending] = useState<{ email: string; resendAfterSeconds: number } | null>(null);
 
-  function startCooldown() {
-    setCooldown(RESEND_COOLDOWN_SECONDS);
-    const timer = setInterval(() => {
-      setCooldown((c) => {
-        if (c <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
+  function signedIn(tokens: TokenPairDto, toastKey: string) {
+    login(tokens);
+    show(t(toastKey), "success");
+    onSuccess();
   }
 
-  async function requestOtp() {
+  async function handleGoogle(idToken: string) {
+    setError(null);
+    setGoogleBusy(true);
+    try {
+      signedIn(await authApi.google(idToken), "auth.toast.logged_in");
+    } catch (err) {
+      setError(authErrorText(err, t));
+    } finally {
+      setGoogleBusy(false);
+    }
+  }
+
+  async function handleSignup() {
     setError(null);
     if (!name.trim()) {
-      setError(t("auth.error.enter_name"));
-      return;
-    }
-    if (!isValidBdPhone(phone)) {
-      setError(t("auth.error.invalid_phone"));
-      return;
-    }
-    if (!isValidPassword(password)) {
-      setError(t("auth.error.password_min"));
+      setError(t("auth.err.NAME_REQUIRED"));
       return;
     }
     if (password !== confirmPassword) {
-      setError(t("auth.error.passwords_mismatch"));
+      setError(t("auth.err.PASSWORD_MISMATCH"));
       return;
     }
-    setSending(true);
+    setSubmitting(true);
     try {
-      await authApi.requestOtp(normalizeBdPhone(phone));
-      setStep("otp");
-      startCooldown();
-      show(t("auth.toast.otp_sent"), "success");
+      const result = await authApi.register({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        confirmPassword,
+        language: lang,
+      });
+      setPending({ email: result.email, resendAfterSeconds: result.resendAfterSeconds });
+      show(t("auth.toast.code_sent"), "success");
     } catch (err) {
-      if (err instanceof ApiClientError && err.status === 429) {
-        setError(t("auth.error.too_many_otp"));
-      } else {
-        setError(errorMessage(err));
-      }
+      setError(authErrorText(err, t));
     } finally {
-      setSending(false);
+      setSubmitting(false);
     }
   }
 
-  async function verifyAndRegister() {
-    setError(null);
-    if (code.trim().length < 4) {
-      setError(t("auth.error.enter_code"));
-      return;
-    }
-    setVerifying(true);
-    try {
-      // Every account can both write reviews and add/manage businesses (spec:
-      // one account, switch modes in the nav) — role is just the backend's
-      // required-but-unused-for-gating field, always CONSUMER at signup.
-      const tokens = await authApi.register(normalizeBdPhone(phone), code.trim(), password, "CONSUMER", name.trim());
-      login(tokens);
-      show(t("auth.toast.account_created"), "success");
-      onSuccess();
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setVerifying(false);
-    }
-  }
-
-  if (!signupsOpen) {
+  if (!newSignupsEnabled) {
     return (
       <div className="space-y-4 text-center">
-        <p className="text-sm text-ink-700">New sign-ups are paused right now. Please check back soon.</p>
+        <p className="text-sm text-ink-700">{t("auth.err.SIGNUPS_CLOSED")}</p>
         <button type="button" onClick={onSwitchToLogin} className="text-sm font-medium text-crimson-700 hover:underline">
-          Already have an account? Log in
+          {t("auth.have_account")} {t("nav.log_in")}
         </button>
       </div>
     );
   }
 
-  if (step === "otp") {
+  if (pending) {
     return (
-      <div className="space-y-4">
-        <p className="text-sm text-ink-500">{t("auth.sent_to", { phone: normalizeBdPhone(phone) })}</p>
-
-        <div>
-          <Label htmlFor="signup-code">{t("auth.otp_code_label")}</Label>
-          <Input
-            id="signup-code"
-            inputMode="numeric"
-            autoFocus
-            placeholder="••••••"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && verifyAndRegister()}
-          />
-          <FieldError>{error}</FieldError>
-        </div>
-
-        <Button className="w-full" size="lg" onClick={verifyAndRegister} loading={verifying}>
-          {t("auth.verify_create_account")}
-        </Button>
-
-        <div className="flex justify-between text-sm text-ink-500">
-          <button type="button" onClick={() => setStep("details")} className="hover:underline">
-            {t("auth.back")}
-          </button>
-          <button
-            type="button"
-            onClick={requestOtp}
-            disabled={cooldown > 0 || sending}
-            className="hover:underline disabled:opacity-50"
-          >
-            {cooldown > 0 ? t("auth.resend_in", { n: cooldown }) : t("auth.resend_code")}
-          </button>
-        </div>
-      </div>
+      <CodeStep
+        email={pending.email}
+        initialCooldown={pending.resendAfterSeconds}
+        submitLabel={t("auth.verify.button")}
+        onSubmit={async (code) => signedIn(await authApi.verifyEmail(pending.email, code), "auth.toast.email_verified")}
+        onResend={async () => (await authApi.resendVerification(pending.email)).resendAfterSeconds}
+        onBack={() => setPending(null)}
+      />
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Label htmlFor="signup-name">{t("account.name")}</Label>
-        <Input
-          id="signup-name"
-          autoFocus
-          placeholder={t("account.name_placeholder")}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
+    <div className="space-y-5">
+      <GoogleButton text="signup_with" onCredential={(token) => void handleGoogle(token)} />
+      {googleBusy && (
+        <div className="flex justify-center" aria-busy="true">
+          <Spinner className="h-5 w-5" />
+        </div>
+      )}
 
-      <div>
-        <Label htmlFor="signup-phone">{t("auth.mobile_number")}</Label>
-        <Input
-          id="signup-phone"
-          inputMode="tel"
-          placeholder="01712345678"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-        />
-      </div>
+      {passwordLoginEnabled && (
+        <>
+          {googleAvailable && <OrDivider />}
 
-      <div>
-        <Label htmlFor="signup-password">{t("auth.password")}</Label>
-        <Input
-          id="signup-password"
-          type="password"
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <FieldHint>{t("auth.hint.min_8_chars")}</FieldHint>
-      </div>
+          <div>
+            <Label htmlFor="signup-name">{t("auth.name")}</Label>
+            <Input
+              id="signup-name"
+              autoComplete="name"
+              placeholder={t("auth.name_placeholder")}
+              value={name}
+              maxLength={120}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
 
-      <div>
-        <Label htmlFor="signup-confirm-password">{t("auth.confirm_password")}</Label>
-        <Input
-          id="signup-confirm-password"
-          type="password"
-          placeholder="••••••••"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && requestOtp()}
-        />
-      </div>
+          <div>
+            <Label htmlFor="signup-email">{t("auth.email")}</Label>
+            <Input
+              id="signup-email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+
+          <PasswordField
+            id="signup-password"
+            label={t("auth.password")}
+            value={password}
+            onChange={setPassword}
+            autoComplete="new-password"
+            showStrength
+          />
+
+          <PasswordField
+            id="signup-password-again"
+            label={t("auth.password_retype")}
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            onEnter={() => void handleSignup()}
+            autoComplete="new-password"
+          />
+        </>
+      )}
 
       <FieldError>{error}</FieldError>
 
-      <Button className="w-full" size="lg" onClick={requestOtp} loading={sending}>
-        {t("button.create_account")}
-      </Button>
+      {passwordLoginEnabled && (
+        <Button className="w-full" size="lg" onClick={() => void handleSignup()} loading={submitting}>
+          {t("auth.create_account")}
+        </Button>
+      )}
 
       <p className="text-center text-sm text-ink-500">
         {t("auth.have_account")}{" "}
-        <button type="button" onClick={onSwitchToLogin} className="text-crimson-700 hover:underline font-medium">
+        <button type="button" onClick={onSwitchToLogin} className="font-medium text-crimson-700 hover:underline">
           {t("nav.log_in")}
         </button>
       </p>
+      <p className="text-center text-xs text-ink-400">{t("auth.terms_note")}</p>
     </div>
   );
 }

@@ -120,7 +120,7 @@ function BookingDetailContent() {
         {booking.staffName && <Row label="Staff" value={booking.staffName} />}
         <Row label="Requested date" value={formatBookingDate(booking.preferredDate)} />
         <Row label="Requested time" value={formatBookingTime(booking.preferredTime)} />
-        <Row label="Contact" value={`${booking.customerName} · ${booking.customerPhone}`} />
+        <Row label="Name" value={booking.customerName} />
       </section>
 
       {booking.customerNote && (
