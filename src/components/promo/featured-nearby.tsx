@@ -9,6 +9,7 @@ import { hiddenAds, hideAd, rememberAttribution, trackPromo } from "@/lib/promo-
 import type { PromoSource, SponsoredBusiness } from "@/lib/types";
 import { cn, focusRing } from "@/lib/utils";
 import { BusinessCard } from "../business-card";
+import { CAROUSEL_ITEM_WIDTH, CarouselStrip } from "../business-carousel";
 import { SponsoredLabel } from "./business-post-card";
 import { useImpression } from "./use-impression";
 
@@ -29,8 +30,9 @@ export function SponsoredBusinessCard({
   const ref = useImpression<HTMLDivElement>(() => trackPromo("IMPRESSION", { postId: item.postId, boostId: item.boostId, source }));
   const refTag = source === "SEARCH" ? "search" : "home";
   return (
-    <div ref={ref} className={cn("relative", className)}>
+    <div ref={ref} className={cn("relative flex flex-col", className)}>
       <div
+        className="flex-1"
         onClickCapture={() => {
           rememberAttribution({ businessId: item.business.id, postId: item.postId, boostId: item.boostId, ref: refTag, source });
           trackPromo("CLICK", { postId: item.postId, boostId: item.boostId, source, ref: refTag });
@@ -98,17 +100,17 @@ export function FeaturedNearby() {
         </h2>
         <SponsoredLabel />
       </div>
-      <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2">
+      <CarouselStrip bleed>
         {items.map((item) => (
           <SponsoredBusinessCard
             key={item.boostId}
             item={item}
             source="HOME"
-            className="w-[220px] shrink-0 snap-start"
+            className={cn("shrink-0 snap-start", CAROUSEL_ITEM_WIDTH)}
             onHidden={() => setItems((prev) => prev.filter((x) => x.boostId !== item.boostId))}
           />
         ))}
-      </div>
+      </CarouselStrip>
     </section>
   );
 }

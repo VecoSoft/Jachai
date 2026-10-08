@@ -80,3 +80,9 @@ export const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   BROADCAST: "Announcement",
   SUPPORT_REPLY: "Support reply",
 };
+
+/** Just the taka symbols for a price tier ("৳৳"), for cards that have no room for the word. */
+export function priceTierSymbols(tier: string | null | undefined): string {
+  if (!tier) return "";
+  return (PRICE_TIER_LABELS[tier] ?? "").split(" ")[0] ?? "";
+}

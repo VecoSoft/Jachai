@@ -646,7 +646,11 @@ export default function BusinessDetailPage() {
 
           {similarBusinesses.length > 0 && (
             <div className="mt-8 border-t border-ink-100 pt-6">
-              <BusinessCarousel title="Similar businesses nearby" businesses={similarBusinesses} />
+              <BusinessCarousel
+                title="Similar businesses nearby"
+                businesses={similarBusinesses}
+                itemWidthClassName="w-[44vw] max-w-[180px] md:w-[220px] md:max-w-none"
+              />
             </div>
           )}
         </div>

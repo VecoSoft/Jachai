@@ -1,9 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { BadgeCheck, Check, MapPin } from "lucide-react";
-import { priceTierLabel } from "@/lib/config";
+import { BadgeCheck, Check, MapPin, Star } from "lucide-react";
+import { priceTierLabel, priceTierSymbols } from "@/lib/config";
 import { categoryIcon } from "@/lib/category-icons";
 import { getOpenStatus, type OpenStatus } from "@/lib/business-hours";
 import { offerDiscountLabel } from "@/lib/offer-constants";
@@ -14,7 +15,7 @@ import { cn, distanceKm, focusRing, formatDistance, formatReviewCount, interacti
 import { BookmarkButton } from "./bookmark-button";
 import { RatingBoxes } from "./rating-boxes";
 
-type Variant = "grid" | "list" | "carousel";
+type Variant = "grid" | "list";
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
 const GRID_IMAGE_SIZES = "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw";
@@ -35,20 +36,23 @@ function badgeLabelFor(business: BusinessCardData, t: Translate): string | null 
   return null;
 }
 
-/** Photo, or a clean category-icon + initial placeholder — no next/image call at all
- *  when there's no photo, since there's nothing to load. */
+/** Photo, or a clean category-icon + initial placeholder — used both when there's no photo
+ *  and when the photo fails to load, so a card never shows a broken-image icon. */
 function CardPhoto({ business, sizes, className }: { business: BusinessCardData; sizes?: string; className?: string }) {
   const photo = business.photoUrls[0] ?? null;
   const CategoryIcon = categoryIcon(business.categoryName);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [photo]);
 
   return (
     <div className={cn("relative w-full overflow-hidden bg-ink-100 dark:bg-ink-800", className)}>
-      {photo ? (
+      {photo && !failed ? (
         <Image
           src={photo}
           alt=""
           fill
           sizes={sizes ?? "96px"}
+          onError={() => setFailed(true)}
           className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
         />
       ) : (
@@ -71,20 +75,22 @@ function CardBadge({ label, className }: { label: string; className?: string }) 
   );
 }
 
-/** ★ 4.2 (128) — or "New · no reviews yet" when nobody's reviewed it yet, never "0.0 (0)". */
+/** "★ 4.0 · 21 reviews" — or "New · no reviews yet" when nobody's reviewed it yet, never
+ *  "0.0 (0)". One small line in both cases, so it never wraps or gets cut off in a narrow card. */
 function RatingLine({ business }: { business: BusinessCardData }) {
   const { t, tn } = useLanguage();
   if (business.reviewCount === 0) {
     return <p className="truncate text-[13px] text-ink-500">{t("business_card.new_no_reviews")}</p>;
   }
   return (
-    <div className="flex items-center gap-1.5 text-[13px]">
-      <RatingBoxes rating={business.averageRating} size="sm" />
-      <span className="font-semibold text-ink-900 dark:text-ink-100">{business.averageRating.toFixed(1)}</span>
-      <span className="tabular-nums text-ink-500">
-        ({tn("business_card.review_count", business.reviewCount, { n: formatReviewCount(business.reviewCount) })})
+    <p className="flex min-w-0 items-center gap-1 text-[13px] text-ink-500">
+      <Star aria-hidden size={13} className="shrink-0 fill-crimson-600 text-crimson-600" />
+      <span className="font-semibold text-ink-800">{business.averageRating.toFixed(1)}</span>
+      <span aria-hidden>·</span>
+      <span className="truncate tabular-nums">
+        {tn("business_card.review_count", business.reviewCount, { n: formatReviewCount(business.reviewCount) })}
       </span>
-    </div>
+    </p>
   );
 }
 
@@ -95,7 +101,14 @@ function StatusLine({ business, distance }: { business: BusinessCardData; distan
   const openStatus = getOpenStatus(business.structuredHours, business.hoursExceptions);
   const openLabel = openLabelFor(openStatus, t);
 
-  if (!openLabel && !distance) return null;
+  // Unknown hours and no location: keep the row's height so every card in a row lines up.
+  if (!openLabel && !distance) {
+    return (
+      <p aria-hidden className="text-[13px]">
+        &nbsp;
+      </p>
+    );
+  }
 
   return (
     <p className="flex items-center gap-1 truncate text-[13px]">
@@ -159,6 +172,23 @@ function StatusAreaLine({ business, distance }: { business: BusinessCardData; di
   );
 }
 
+/** Name with the Verified tick glued to its last word, so the tick never wraps onto a line by itself. */
+function NameWithMark({ name, verified }: { name: string; verified: boolean }) {
+  if (!verified) return <>{name}</>;
+  const cut = name.trimEnd().lastIndexOf(" ");
+  const head = cut >= 0 ? name.slice(0, cut + 1) : "";
+  const last = cut >= 0 ? name.slice(cut + 1) : name;
+  return (
+    <>
+      {head}
+      <span className="whitespace-nowrap">
+        {last}
+        <VerifiedMark />
+      </span>
+    </>
+  );
+}
+
 function VerifiedMark() {
   return (
     <BadgeCheck
@@ -190,23 +220,30 @@ function CardMeta({
   distance: string | null;
   matchReasons?: string[];
 }) {
-  const { lang } = useLanguage();
   return (
     <>
-      <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug text-ink-900 dark:text-ink-100">
-        {business.name}
-        {business.verified && <VerifiedMark />}
+      {/* Two lines always reserved for the name and one for the offer line, so every card has
+          the same height whatever its neighbours — a carousel card and a grid card match exactly. */}
+      <h3 className="line-clamp-2 min-h-[2.75em] text-[15px] font-semibold leading-snug text-ink-900">
+        <NameWithMark name={business.name} verified={business.verified} />
       </h3>
       <RatingLine business={business} />
       <p className="truncate text-[13px] text-ink-500">
-        {business.categoryName} · {priceTierLabel(business.priceTier, lang)}
+        {business.categoryName}
+        {priceTierSymbols(business.priceTier) && <> · {priceTierSymbols(business.priceTier)}</>}
       </p>
       <StatusLine business={business} distance={distance} />
       <p className="truncate text-[13px] text-ink-500">
         {business.areaName}, {business.cityName}
       </p>
       <MatchReasons reasons={matchReasons} />
-      {business.activeOffer && <p className="truncate text-xs font-medium text-crimson-600">{business.activeOffer.title}</p>}
+      {business.activeOffer ? (
+        <p className="truncate text-xs font-medium text-crimson-600">{business.activeOffer.title}</p>
+      ) : (
+        <p aria-hidden className="text-xs">
+          &nbsp;
+        </p>
+      )}
     </>
   );
 }
@@ -247,8 +284,8 @@ function reviewsPhraseFor(business: BusinessCardData): string {
 
 /**
  * The one business card for every surface in the app (home Trending/Most-loved/Browse,
- * Similar businesses, Saved/Bookmarks) — grid/carousel share the same vertical tile,
- * list is a horizontal row for a denser single column. Distance is self-sourced from
+ * Similar businesses, Saved/Bookmarks) — carousels and the Browse grid use the same
+ * vertical "grid" tile; list is a horizontal row for a denser single column. Distance is self-sourced from
  * the shared LocationProvider (see lib/location-context.tsx), not a prop, so granting
  * location anywhere makes it show up on every card everywhere with no plumbing.
  */
@@ -296,9 +333,8 @@ export function BusinessCard({
         <CardPhoto business={business} sizes="96px" className="size-24 shrink-0 rounded-lg" />
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="line-clamp-1 text-[15px] font-semibold leading-snug text-ink-900 dark:text-ink-100">
-              {business.name}
-              {business.verified && <VerifiedMark />}
+            <h3 className="line-clamp-1 text-[15px] font-semibold leading-snug text-ink-900">
+              <NameWithMark name={business.name} verified={business.verified} />
             </h3>
             {badgeLabel && <CardBadge label={badgeLabel} className="shrink-0" />}
           </div>
@@ -313,11 +349,11 @@ export function BusinessCard({
     );
   }
 
-  // grid + carousel — visually identical tile; the carousel's fixed width comes from its
-  // wrapper (see BusinessCarousel), not from this component.
+  // The grid tile — also what every homepage carousel renders (BusinessCarousel sizes each
+  // card to exactly one Browse grid column, so the two look identical).
   return (
     <Link href={href} aria-label={srLabel} className={cn(cardClasses, "relative flex h-full flex-col overflow-hidden", className)}>
-      <CardPhoto business={business} sizes={GRID_IMAGE_SIZES} className={variant === "carousel" ? "aspect-square" : "aspect-square md:aspect-[4/3]"} />
+      <CardPhoto business={business} sizes={GRID_IMAGE_SIZES} className="aspect-square md:aspect-[4/3]" />
       {badgeLabel && <CardBadge label={badgeLabel} className="absolute left-2 top-2" />}
       <div className="absolute right-2 top-2">
         <BookmarkButton businessId={business.id} businessName={business.name} iconOnly />

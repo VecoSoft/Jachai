@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import type { BusinessResponse } from "@/lib/types";
@@ -21,14 +22,17 @@ export function BrandCard({ business, matchReasons }: { business: BusinessRespon
   const { t, tn } = useLanguage();
   const photo = business.photoUrls[0] ?? business.coverPhotoUrl ?? null;
   const rating = business.brandAverageRating ?? business.averageRating;
+  // A photo that fails to load falls back to the placeholder — never a broken-image icon.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [photo]);
 
   return (
     <Card className="flex h-full flex-col overflow-hidden rounded-xl border border-ink-100 bg-white transition-shadow duration-200 hover:shadow-lift">
       <Link href={`/business/${business.slug}`} className="flex grow flex-col">
         <div className="relative h-48 w-full flex-none overflow-hidden rounded-t-xl bg-ink-100">
-          {photo ? (
+          {photo && !failed ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={photo} alt={business.brandName ?? business.name} className="h-full w-full object-cover" />
+            <img src={photo} alt={business.brandName ?? business.name} onError={() => setFailed(true)} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-gradient-to-br from-ink-900 to-ink-800 text-ink-400">
               <StoreIcon />
