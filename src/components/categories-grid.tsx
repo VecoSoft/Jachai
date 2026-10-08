@@ -21,8 +21,8 @@ export function CategoriesGrid({ onSelect }: { onSelect: (category: Category) =>
   if (categories.length === 0) return null;
 
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <h2 className="font-display text-2xl md:text-3xl font-bold text-ink-900 text-center mb-8">
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
+      <h2 className="font-display text-2xl md:text-3xl font-bold text-ink-900 text-center mb-5">
         Categories
       </h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

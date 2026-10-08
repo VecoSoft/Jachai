@@ -352,7 +352,7 @@ export default function HomePage() {
       )}
 
       {(trending.length > 0 || mostLoved.length > 0) && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           {trending.length > 0 && (
             <Reveal>
               <BusinessCarousel title="Trending this week" businesses={trending} bleed />
@@ -367,13 +367,14 @@ export default function HomePage() {
       )}
 
       {/* V58: paid, clearly labelled "Sponsored" carousel — renders nothing when no boost is eligible. */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+      {/* empty:hidden — no eligible boost renders nothing, so the wrapper leaves no gap either. */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 empty:hidden">
         <FeaturedNearby />
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Reveal>
-          <div className="mx-auto max-w-md py-4">
+          <div className="mx-auto max-w-md py-4 empty:hidden">
             <QuestionsForYouWidget limit={4} />
           </div>
         </Reveal>
@@ -387,9 +388,9 @@ export default function HomePage() {
           <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full blur-3xl" />
           <div className="pointer-events-none absolute top-1/2 -right-24 h-80 w-80 rounded-full blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 left-1/3 h-72 w-72 rounded-full blur-3xl" />
-                <div ref={resultsRef} className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 scroll-mt-20">
+                <div ref={resultsRef} className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 scroll-mt-20">
           <Reveal>
-            <div className="text-center pt-2 mb-6">
+            <div className="text-center mb-4">
               <h2 className="font-display text-2xl md:text-3xl font-bold text-ink-900">Browse businesses</h2>
               <span className="mt-2.5 mx-auto block h-1 w-16 rounded-full bg-gradient-to-r from-crimson-500 to-amber-400" />
             </div>

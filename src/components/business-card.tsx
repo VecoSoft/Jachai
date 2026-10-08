@@ -101,14 +101,7 @@ function StatusLine({ business, distance }: { business: BusinessCardData; distan
   const openStatus = getOpenStatus(business.structuredHours, business.hoursExceptions);
   const openLabel = openLabelFor(openStatus, t);
 
-  // Unknown hours and no location: keep the row's height so every card in a row lines up.
-  if (!openLabel && !distance) {
-    return (
-      <p aria-hidden className="text-[13px]">
-        &nbsp;
-      </p>
-    );
-  }
+  if (!openLabel && !distance) return null;
 
   return (
     <p className="flex items-center gap-1 truncate text-[13px]">
@@ -222,9 +215,7 @@ function CardMeta({
 }) {
   return (
     <>
-      {/* Two lines always reserved for the name and one for the offer line, so every card has
-          the same height whatever its neighbours — a carousel card and a grid card match exactly. */}
-      <h3 className="line-clamp-2 min-h-[2.75em] text-[15px] font-semibold leading-snug text-ink-900">
+      <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug text-ink-900">
         <NameWithMark name={business.name} verified={business.verified} />
       </h3>
       <RatingLine business={business} />
@@ -237,13 +228,7 @@ function CardMeta({
         {business.areaName}, {business.cityName}
       </p>
       <MatchReasons reasons={matchReasons} />
-      {business.activeOffer ? (
-        <p className="truncate text-xs font-medium text-crimson-600">{business.activeOffer.title}</p>
-      ) : (
-        <p aria-hidden className="text-xs">
-          &nbsp;
-        </p>
-      )}
+      {business.activeOffer && <p className="truncate text-xs font-medium text-crimson-600">{business.activeOffer.title}</p>}
     </>
   );
 }

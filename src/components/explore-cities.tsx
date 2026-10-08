@@ -70,7 +70,7 @@ export function ExploreCities({ onSelectArea }: { onSelectArea: (area: Area) => 
   const activeCity = cities.find((c) => c.id === activeCityId) ?? null;
 
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
       <h2 className="font-display text-2xl md:text-3xl font-bold text-ink-900 mb-1">
         Explore areas in popular cities
       </h2>
